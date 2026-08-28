@@ -18,12 +18,17 @@ export const PRESETS: Preset[] = [
       const s = base();
       s.A = loop({ zoom: 0.86, rotate: 0.06, glassMix: 0, copyRotate: 0, folds: 1 });
       s.A.top = knobs(0, 0.9, 0.98, 1.15);
+      s.A.bot = knobs(0.02, 1.1, 0.94, 1.12);
       s.view = 0;
       s.insanity = false;
       s.hueDrift = 0.01;
       s.noise = 0.025;
       s.barrel = 0.08;
       s.scan = 0.32;
+      s.persist = 0.26;
+      s.seedAmt = 0.05;
+      s.bloom = 0.08;
+      s.copyFalloff = 1;
       return s;
     },
   },
@@ -41,10 +46,17 @@ export const PRESETS: Preset[] = [
         copyScale: 1,
         folds: 2,
       });
-      s.A.top = knobs(-0.02, 1.25, 0.92, 1.28);
-      s.A.bot = knobs(0.05, 1.2, 0.92, 1.22);
+      s.A.top = knobs(-0.02, 1.02, 0.58, 1.36);
+      s.A.bot = knobs(0.05, 0.96, 0.54, 1.3);
       s.view = 0;
-      s.edge = 0.1;
+      s.edge = 0.12;
+      s.persist = 0.08;
+      s.seedAmt = 0.018;
+      s.bloom = 0.03;
+      s.gamma = 1.04;
+      s.vignette = 0.18;
+      s.copyFalloff = 0.72;
+      s.decay = 0.98;
       return s;
     },
   },
@@ -57,15 +69,22 @@ export const PRESETS: Preset[] = [
       s.A = loop({
         zoom: 0.6,
         rotate: 0.04,
-        glassMix: 1,
+        glassMix: 0.55,
         copyRotate: 0.85,
         folds: 2,
-        delayFrames: 5,
-        delayMix: 0.28,
+        delayFrames: 3,
+        delayMix: 0.12,
       });
       s.A.bottomSrc = 0;
-      s.A.top = knobs(0.01, 1.08, 0.97, 1.22);
-      s.persist = 0.22;
+      s.A.top = knobs(0.01, 0.95, 0.55, 1.22);
+      s.A.bot = knobs(0.02, 0.9, 0.42, 1.18);
+      s.persist = 0.08;
+      s.seedAmt = 0.012;
+      s.bloom = 0;
+      s.gamma = 1.08;
+      s.decay = 0.97;
+      s.copyFalloff = 0.7;
+      s.vignette = 0.16;
       return s;
     },
   },
@@ -80,10 +99,16 @@ export const PRESETS: Preset[] = [
       s.B = loop({ zoom: 0.52, rotate: -0.16, glassMix: 1, copyRotate: -1.4, folds: 2 });
       s.A.bottomSrc = 2;
       s.B.bottomSrc = 2;
-      s.A.top = knobs(-0.04, 1.4, 0.94, 1.4);
-      s.B.top = knobs(0.08, 1.3, 0.94, 1.36);
+      s.A.top = knobs(-0.04, 1.08, 0.52, 1.3);
+      s.A.bot = knobs(0.02, 0.98, 0.48, 1.24);
+      s.B.top = knobs(0.08, 1.02, 0.5, 1.28);
+      s.B.bot = knobs(0.06, 0.95, 0.46, 1.22);
       s.view = 4;
-      s.otherAmt = 0.85;
+      s.otherAmt = 0.7;
+      s.persist = 0.09;
+      s.seedAmt = 0.02;
+      s.bloom = 0.05;
+      s.gamma = 1.05;
       return s;
     },
   },
@@ -101,13 +126,18 @@ export const PRESETS: Preset[] = [
         copyScale: 1,
         folds: 3,
       });
-      s.A.top = knobs(0.1, 0.45, 0.98, 1.55);
-      s.A.bot = knobs(0.1, 0.45, 0.98, 1.55);
-      s.gamma = 0.88;
-      s.edge = 0.18;
-      s.noise = 0.008;
+      s.A.top = knobs(0.08, 0.78, 0.48, 1.28);
+      s.A.bot = knobs(0.08, 0.72, 0.44, 1.24);
+      s.gamma = 1.1;
+      s.edge = 0.12;
+      s.noise = 0.006;
       s.hueDrift = 0;
       s.bloom = 0;
+      s.persist = 0.04;
+      s.seedAmt = 0.01;
+      s.vignette = 0.22;
+      s.decay = 0.965;
+      s.copyFalloff = 0.62;
       return s;
     },
   },
@@ -126,6 +156,8 @@ export const PRESETS: Preset[] = [
       s.bloom = 0.35;
       s.soft = 0.35;
       s.hueDrift = 0.005;
+      s.seedAmt = 0.05;
+      s.copyFalloff = 1;
       return s;
     },
   },
@@ -145,8 +177,15 @@ export const PRESETS: Preset[] = [
         copyOffY: -0.04,
         folds: 2,
       });
-      s.A.top = knobs(0.28, 1.5, 0.96, 1.4);
-      s.edge = 0.14;
+      s.A.top = knobs(0.18, 1.05, 0.5, 1.28);
+      s.A.bot = knobs(0.14, 0.95, 0.44, 1.22);
+      s.edge = 0.12;
+      s.persist = 0.05;
+      s.seedAmt = 0.012;
+      s.bloom = 0;
+      s.gamma = 1.08;
+      s.decay = 0.97;
+      s.copyFalloff = 0.68;
       return s;
     },
   },
@@ -161,13 +200,17 @@ export const PRESETS: Preset[] = [
       s.insanity = true;
       s.A.bottomSrc = 2;
       s.B.bottomSrc = 2;
-      s.A.top = knobs(0, 1.7, 0.92, 1.45);
+      s.A.top = knobs(0, 1.2, 0.56, 1.34);
+      s.A.bot = knobs(0.04, 1.08, 0.5, 1.28);
       s.hueDrift = 0.01;
       s.aberration = 0.006;
       s.chromaSep = 0.12;
-      s.bloom = 0.4;
+      s.bloom = 0.14;
       s.view = 3;
       s.fps = 24;
+      s.persist = 0.1;
+      s.seedAmt = 0.02;
+      s.gamma = 1.04;
       return s;
     },
   },
@@ -193,8 +236,16 @@ export const PRESETS: Preset[] = [
     apply: () => {
       const s = base();
       s.A = loop({ zoom: 0.48, rotate: 0.08, spin: 0.05, glassMix: 1, copyRotate: Math.PI / 3, folds: 6 });
-      s.A.top = knobs(0.08, 1.25, 0.95, 1.35);
-      s.bloom = 0.2;
+      s.A.top = knobs(0.06, 1.0, 0.42, 1.28);
+      s.A.bot = knobs(0.08, 0.9, 0.36, 1.22);
+      s.bloom = 0;
+      s.persist = 0.03;
+      s.seedAmt = 0.01;
+      s.gamma = 1.12;
+      s.vignette = 0.24;
+      s.edge = 0.08;
+      s.decay = 0.96;
+      s.copyFalloff = 0.58;
       return s;
     },
   },

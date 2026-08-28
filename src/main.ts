@@ -18,6 +18,7 @@ const gate = document.querySelector<HTMLElement>("#gate")!;
 const about = document.querySelector<HTMLElement>("#about")!;
 const coach = document.querySelector<HTMLElement>("#coach")!;
 const coachCopy = document.querySelector<HTMLElement>("#coach-copy")!;
+const panHint = document.querySelector<HTMLElement>("#pan-hint")!;
 const playNudge = document.querySelector<HTMLElement>("#play-nudge")!;
 
 const herder = new DigitalHerder(canvas);
@@ -39,7 +40,7 @@ let coachStep = 0;
 
 const COACH = [
   "Each thumbnail is a different universe. Tap one. Then another. There is no bottom.",
-  "Scale is depth — smaller means more nested copies. Bright and Contrast are how you steer.",
+  "Drag the picture — up, down, left, right — to walk the nest. Scale is depth.",
   "Trap locks a picture in the loop. Double-tap the screen. Then go as far as it will take you.",
 ];
 
@@ -47,9 +48,19 @@ function isPhone(): boolean {
   return window.matchMedia("(max-width: 800px)").matches;
 }
 
+function pulseSeed(presetId: string): void {
+  herder.clear();
+  if (presetId === "fair-captive") herder.inject(0);
+  else if (presetId === "first-light" || presetId === "jellyfish") herder.inject(0.85);
+  else herder.inject(0.35);
+}
+
+function hidePanHint(): void {
+  panHint.classList.add("gone");
+}
+
 paintSeed(seedCanvas.getContext("2d")!, seedKind);
 herder.setSeed(seedCanvas);
-herder.inject(1);
 
 function sizeCanvas(): void {
   const rect = canvas.getBoundingClientRect();
@@ -125,13 +136,11 @@ function startSession(id: string): void {
   herder.state = p.apply();
   if (sess.spin != null) herder.state.A.spin = sess.spin;
   if (Math.abs(herder.state.A.spin) < 0.02) herder.state.A.spin = 0.05;
-  herder.state.seedAmt = Math.max(herder.state.seedAmt, 0.05);
-  herder.state.persist = Math.max(herder.state.persist, 0.24);
   herder.state.feedbackAmt = Math.max(herder.state.feedbackAmt, 1);
   if (isPhone()) herder.resize(540);
-  hint.textContent = `${sess.blurb} Smaller Scale = deeper nests.`;
-  playNudge.textContent = `${sess.name} · ${sess.tag}. Trap locks a picture. Double-tap to go further.`;
-  herder.inject(1);
+  hint.textContent = `${sess.blurb} Drag the picture to walk it. Smaller Scale = deeper nests.`;
+  playNudge.textContent = `${sess.name} · ${sess.tag}. Drag to pan. Trap locks a picture.`;
+  pulseSeed(sess.preset);
   if (sess.preset !== "fair-captive") {
     herder.state.A.bottomSrc = 1;
     herder.state.B.bottomSrc = 1;
@@ -248,13 +257,11 @@ function buildDesk(): void {
         const p = PRESETS.find((x) => x.id === id);
         if (!p) return;
         herder.state = p.apply();
-        herder.state.seedAmt = Math.max(herder.state.seedAmt, 0.05);
-        herder.state.persist = Math.max(herder.state.persist, 0.24);
         if (Math.abs(herder.state.A.spin) < 0.02) herder.state.A.spin = 0.05;
         hint.textContent = p.hint;
         buildDesk();
         buildPlayHerd();
-        herder.inject(0.85);
+        pulseSeed(id);
         if (id !== "fair-captive") {
           herder.state.A.bottomSrc = 1;
           herder.state.B.bottomSrc = 1;
@@ -514,6 +521,7 @@ canvas.addEventListener("pointermove", (e) => {
   if (!e.buttons) return;
   herder.state.A.panX += e.movementX * 0.0015;
   herder.state.A.panY -= e.movementY * 0.0015;
+  hidePanHint();
 });
 let lastTap = 0;
 canvas.addEventListener("pointerup", (e) => {
@@ -541,8 +549,24 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "e") A.rotate += 0.04;
   if (e.key === "w") A.zoom = Math.min(0.9, A.zoom + 0.01);
   if (e.key === "s") A.zoom = Math.max(0.34, A.zoom - 0.01);
-  if (e.key === "a") A.panX -= 0.01;
-  if (e.key === "d") A.panX += 0.01;
+  if (e.key === "a" || e.key === "ArrowLeft") {
+    A.panX -= 0.01;
+    hidePanHint();
+  }
+  if (e.key === "d" || e.key === "ArrowRight") {
+    A.panX += 0.01;
+    hidePanHint();
+  }
+  if (e.key === "ArrowUp") {
+    e.preventDefault();
+    A.panY += 0.01;
+    hidePanHint();
+  }
+  if (e.key === "ArrowDown") {
+    e.preventDefault();
+    A.panY -= 0.01;
+    hidePanHint();
+  }
   if (e.key >= "1" && e.key <= "9") {
     const sess = SESSIONS[Number(e.key) - 1];
     if (sess) startSession(sess.id);

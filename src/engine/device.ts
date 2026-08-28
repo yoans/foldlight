@@ -244,7 +244,8 @@ export class DigitalHerder {
     u.f("uBarrel", this.state.barrel);
     u.f("uEdge", this.state.edge);
     u.f("uHueDrift", this.state.hueDrift);
-    u.f("uSeedAmt", Math.max(this.state.seedAmt, seedPulse));
+    u.f("uSeedAmt", this.state.seedAmt);
+    u.f("uSeedPulse", seedPulse);
     u.f("uOtherAmt", insanity ? this.state.otherAmt : 0);
     u.f("uDelayAmt", L.delayFrames > 0 ? L.delayMix : 0);
     u.f("uSoft", this.state.soft);
@@ -256,6 +257,7 @@ export class DigitalHerder {
     u.f("uInvert", this.state.invert);
     u.f("uChromaSep", this.state.chromaSep);
     u.f("uFeedbackAmt", this.state.feedbackAmt);
+    u.f("uCopyFalloff", this.state.copyFalloff);
     u.i("uFlipH", L.flipH ? 1 : 0);
     u.i("uFlipV", L.flipV ? 1 : 0);
     u.i("uKeyMode", this.state.keyMode);

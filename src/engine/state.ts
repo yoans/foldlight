@@ -70,9 +70,10 @@ export type DeviceState = {
   period: number;
   otherAmt: number;
   resolution: 540 | 720 | 1080;
+  copyFalloff: number;
 };
 
-export function knobs(hue = 0, sat = 1.18, bright = 1.0, contrast = 1.22): MonitorKnobs {
+export function knobs(hue = 0, sat = 1.08, bright = 0.66, contrast = 1.32): MonitorKnobs {
   return { hue, sat, bright, contrast };
 }
 
@@ -95,7 +96,7 @@ export function loop(partial: Partial<LoopState> = {}): LoopState {
     flipH: false,
     flipV: false,
     top: knobs(),
-    bot: knobs(0.02, 1.1, 0.94, 1.12),
+    bot: knobs(0.02, 1.0, 0.6, 1.18),
     ...partial,
   };
 }
@@ -103,7 +104,7 @@ export function loop(partial: Partial<LoopState> = {}): LoopState {
 export function defaultState(): DeviceState {
   return {
     A: loop(),
-    B: loop({ rotate: -0.08, copyRotate: -Math.PI / 2, top: knobs(0.04, 1.2, 0.95, 1.4) }),
+    B: loop({ rotate: -0.08, copyRotate: -Math.PI / 2, top: knobs(0.04, 1.05, 0.6, 1.32) }),
     C: loop({ zoom: 0.72, glassMix: 0.35, copyRotate: 0.5, folds: 1 }),
     linkedRods: true,
     insanity: false,
@@ -116,13 +117,13 @@ export function defaultState(): DeviceState {
     gamma: 0.92,
     noise: 0.016,
     aberration: 0.0015,
-    persist: 0.26,
+    persist: 0.1,
     decay: 1,
     barrel: 0.02,
     edge: 0.06,
     hueDrift: 0.002,
     soft: 0,
-    bloom: 0.08,
+    bloom: 0.04,
     smear: 0,
     warp: 0,
     poster: 0,
@@ -133,7 +134,7 @@ export function defaultState(): DeviceState {
     keyClip: 0.25,
     keyGain: 0.2,
     keyColor: [0, 1, 0],
-    seedAmt: 0.05,
+    seedAmt: 0.02,
     feedbackAmt: 1,
     quantize: false,
     bpm: 120,
@@ -141,6 +142,7 @@ export function defaultState(): DeviceState {
     period: 1,
     otherAmt: 0.85,
     resolution: 720,
+    copyFalloff: 0.78,
   };
 }
 
