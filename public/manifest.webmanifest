@@ -1,0 +1,18 @@
+{
+  "name": "Foldlight",
+  "short_name": "Foldlight",
+  "description": "Infinite nested light — trap a picture and go as far as the loop will take you.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0c0806",
+  "theme_color": "#1a120c",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
