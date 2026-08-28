@@ -1,28 +1,32 @@
 # Deploy: GitHub Pages, then foldlight.buildbeyondbelief.com
 
-Static Vite app. First ship is the GitHub Pages URL so the site works before DNS.
+Static Vite app. Live now on GitHub Pages from the `gh-pages` branch (the GitHub token could not push Actions workflow files).
 
-## 1. GitHub Pages
+## 1. Live
 
-Repo: `yoans/foldlight`. Pages source = **GitHub Actions** (`.github/workflows/pages.yml`).
+- Site: **https://yoans.github.io/foldlight/**
+- Repo: https://github.com/yoans/foldlight
 
-Live: **https://yoans.github.io/foldlight/**
+Rebuild and republish:
+
+```bash
+npm run build
+npx gh-pages -d dist --dotfiles
+```
 
 ## 2. Custom domain (when DNS is ready)
 
-Add `public/CNAME` with:
+Same pattern as `excavation.buildbeyondbelief.com`.
 
-```
-foldlight.buildbeyondbelief.com
-```
-
-DNS where `buildbeyondbelief.com` lives:
+DNS where `buildbeyondbelief.com` lives (Cloudflare):
 
 | Type | Name | Target |
 | --- | --- | --- |
 | CNAME | `foldlight` | `yoans.github.io` |
 
-Then repo **Settings → Pages → Custom domain** = `foldlight.buildbeyondbelief.com`. Apex stays on the existing host.
+Then add `public/CNAME` with `foldlight.buildbeyondbelief.com`, rebuild, republish, and set the custom domain in repo Settings → Pages.
+
+Apex `buildbeyondbelief.com` stays on the existing host.
 
 ## 3. Local
 
