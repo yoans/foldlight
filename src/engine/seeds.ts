@@ -1,4 +1,33 @@
-export type SeedKind = "plasma" | "burst" | "sun" | "glyphs" | "noise" | "grid" | "portrait";
+export type SeedKind =
+  | "plasma"
+  | "burst"
+  | "sun"
+  | "glyphs"
+  | "noise"
+  | "grid"
+  | "portrait"
+  | "arcs"
+  | "bloom"
+  | "chevrons"
+  | "drift"
+  | "iso"
+  | "rings";
+
+export const SEED_LABELS: { label: string; value: SeedKind }[] = [
+  { label: "Tiles / monitors", value: "grid" },
+  { label: "Arc tiles", value: "arcs" },
+  { label: "Packed bloom", value: "bloom" },
+  { label: "Chevrons", value: "chevrons" },
+  { label: "Drift field", value: "drift" },
+  { label: "Iso stack", value: "iso" },
+  { label: "Polar rings", value: "rings" },
+  { label: "Color burst", value: "burst" },
+  { label: "Plasma", value: "plasma" },
+  { label: "Sun", value: "sun" },
+  { label: "Glyphs / poem", value: "glyphs" },
+  { label: "Noise", value: "noise" },
+  { label: "Fair captive", value: "portrait" },
+];
 
 export function makeSeedCanvas(size = 1024): HTMLCanvasElement {
   const c = document.createElement("canvas");
@@ -127,6 +156,169 @@ export function paintSeed(ctx: CanvasRenderingContext2D, kind: SeedKind, t = 0):
     ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 6;
     ctx.strokeRect(w * 0.18, h * 0.18, w * 0.64, h * 0.64);
+    return;
+  }
+
+  // Public geometry, drawn here — not copies of anyone's SVG catalog.
+  if (kind === "arcs") {
+    const n = 10;
+    const s = w / n;
+    ctx.fillStyle = "#12080c";
+    ctx.fillRect(0, 0, w, h);
+    const pal = ["#e23d2b", "#f4c430", "#2ec4b6", "#7b5cff", "#f5f0e6"];
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) {
+        const cx = (x + 0.5) * s;
+        const cy = (y + 0.5) * s;
+        const flip = hash(x * 19 + y * 41) > 0.5;
+        ctx.strokeStyle = pal[(x + y) % pal.length];
+        ctx.lineWidth = Math.max(3, s * 0.18);
+        ctx.beginPath();
+        if (flip) {
+          ctx.arc(x * s, y * s, s * 0.5, 0, Math.PI / 2);
+        } else {
+          ctx.arc((x + 1) * s, y * s, s * 0.5, Math.PI / 2, Math.PI);
+        }
+        ctx.stroke();
+        ctx.beginPath();
+        if (flip) {
+          ctx.arc((x + 1) * s, (y + 1) * s, s * 0.5, Math.PI, Math.PI * 1.5);
+        } else {
+          ctx.arc(x * s, (y + 1) * s, s * 0.5, Math.PI * 1.5, Math.PI * 2);
+        }
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(cx, cy, s * 0.08, 0, Math.PI * 2);
+        ctx.fillStyle = pal[(x + y + 2) % pal.length];
+        ctx.fill();
+      }
+    }
+    return;
+  }
+
+  if (kind === "bloom") {
+    ctx.fillStyle = "#08060c";
+    ctx.fillRect(0, 0, w, h);
+    const c = w * 0.018;
+    const gold = Math.PI * (3 - Math.sqrt(5));
+    for (let i = 0; i < 420; i++) {
+      const a = i * gold;
+      const r = c * Math.sqrt(i);
+      const x = w * 0.5 + Math.cos(a) * r;
+      const y = h * 0.5 + Math.sin(a) * r;
+      const rad = 4 + (i % 7);
+      ctx.beginPath();
+      ctx.arc(x, y, rad, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${(i * 4 + 20) % 360}, 78%, ${48 + (i % 20)}%, 0.92)`;
+      ctx.fill();
+    }
+    return;
+  }
+
+  if (kind === "chevrons") {
+    ctx.fillStyle = "#100806";
+    ctx.fillRect(0, 0, w, h);
+    const pal = ["#e23d2b", "#c9a227", "#2ec4b6", "#1a120c", "#f5f0e6"];
+    const band = h / 12;
+    for (let row = -2; row < 16; row++) {
+      ctx.fillStyle = pal[((row % pal.length) + pal.length) % pal.length];
+      ctx.beginPath();
+      const y0 = row * band;
+      ctx.moveTo(0, y0);
+      ctx.lineTo(w * 0.5, y0 + band * 1.4);
+      ctx.lineTo(w, y0);
+      ctx.lineTo(w, y0 + band);
+      ctx.lineTo(w * 0.5, y0 + band * 2.4);
+      ctx.lineTo(0, y0 + band);
+      ctx.closePath();
+      ctx.fill();
+    }
+    return;
+  }
+
+  if (kind === "drift") {
+    ctx.fillStyle = "#07060a";
+    ctx.fillRect(0, 0, w, h);
+    ctx.lineWidth = Math.max(2, w / 220);
+    ctx.lineCap = "round";
+    for (let i = 0; i < 70; i++) {
+      let x = hash(i + 3) * w;
+      let y = hash(i + 11) * h;
+      ctx.strokeStyle = `hsla(${(hash(i) * 280 + 10) % 360}, 85%, 58%, 0.88)`;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      for (let k = 0; k < 28; k++) {
+        const a = (hash(i * 17 + k) - 0.5) * 1.4 + Math.sin(y * 0.01 + i) * 0.6;
+        x += Math.cos(a) * (w * 0.028);
+        y += Math.sin(a) * (h * 0.028);
+        ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    return;
+  }
+
+  if (kind === "iso") {
+    ctx.fillStyle = "#0c0a08";
+    ctx.fillRect(0, 0, w, h);
+    const size = w / 9;
+    const faces = ["#e23d2b", "#7b5cff", "#2ec4b6"];
+    const iso = (col: number, row: number, shade: number) => {
+      const x = w * 0.5 + (col - row) * size * 0.86;
+      const y = h * 0.12 + (col + row) * size * 0.5;
+      ctx.fillStyle = faces[shade];
+      ctx.beginPath();
+      if (shade === 0) {
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + size * 0.86, y + size * 0.5);
+        ctx.lineTo(x, y + size);
+        ctx.lineTo(x - size * 0.86, y + size * 0.5);
+      } else if (shade === 1) {
+        ctx.moveTo(x, y + size);
+        ctx.lineTo(x + size * 0.86, y + size * 0.5);
+        ctx.lineTo(x + size * 0.86, y + size * 1.5);
+        ctx.lineTo(x, y + size * 2);
+      } else {
+        ctx.moveTo(x, y + size);
+        ctx.lineTo(x - size * 0.86, y + size * 0.5);
+        ctx.lineTo(x - size * 0.86, y + size * 1.5);
+        ctx.lineTo(x, y + size * 2);
+      }
+      ctx.closePath();
+      ctx.fill();
+    };
+    for (let row = 0; row < 8; row++) {
+      for (let col = 0; col < 8; col++) {
+        if (hash(col * 8 + row) < 0.22) continue;
+        iso(col, row, 0);
+        iso(col, row, 1);
+        iso(col, row, 2);
+      }
+    }
+    return;
+  }
+
+  if (kind === "rings") {
+    ctx.fillStyle = "#0a0810";
+    ctx.fillRect(0, 0, w, h);
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+    for (let i = 1; i < 18; i++) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, i * (w * 0.028), 0, Math.PI * 2);
+      ctx.strokeStyle = `hsla(${200 + i * 8}, 80%, ${40 + (i % 5) * 8}%, 0.9)`;
+      ctx.lineWidth = i % 3 === 0 ? 10 : 3;
+      ctx.stroke();
+    }
+    for (let i = 0; i < 24; i++) {
+      const a = (i / 24) * Math.PI * 2;
+      ctx.strokeStyle = "#f4c430";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * w * 0.08, cy + Math.sin(a) * h * 0.08);
+      ctx.lineTo(cx + Math.cos(a) * w * 0.46, cy + Math.sin(a) * h * 0.46);
+      ctx.stroke();
+    }
     return;
   }
 

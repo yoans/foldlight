@@ -1,8 +1,8 @@
 import { DigitalHerder } from "./engine/device";
 import { PRESETS } from "./engine/presets";
-import { makeSeedCanvas, paintSeed, type SeedKind } from "./engine/seeds";
+import { makeSeedCanvas, paintSeed, SEED_LABELS, type SeedKind } from "./engine/seeds";
 import type { DeviceState, LoopState, MonitorKnobs } from "./engine/state";
-import { SESSIONS } from "./sessions";
+import { FAMILIES, SESSIONS, type Family } from "./sessions";
 import { btn, Knob, section, toggle } from "./ui/widgets";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#view")!;
@@ -12,6 +12,7 @@ const hint = document.querySelector<HTMLElement>("#hint")!;
 const fpsEl = document.querySelector<HTMLElement>("#fps")!;
 const modeEl = document.querySelector<HTMLElement>("#mode")!;
 const sessionsEl = document.querySelector<HTMLElement>("#sessions")!;
+const startFilters = document.querySelector<HTMLElement>("#start-filters")!;
 const playHerd = document.querySelector<HTMLElement>("#play-herd")!;
 const gate = document.querySelector<HTMLElement>("#gate")!;
 const about = document.querySelector<HTMLElement>("#about")!;
@@ -33,10 +34,11 @@ let rec: DeviceState[] = [];
 let recIndex = 0;
 let currentPreset = "king-glass";
 let currentSession = "king-glass";
+let familyFilter: "all" | Family = "all";
 let coachStep = 0;
 
 const COACH = [
-  "Each chip is a different universe. Open one. Then another. There is no bottom.",
+  "Each thumbnail is a different universe. Tap one. Then another. There is no bottom.",
   "Scale is depth — smaller means more nested copies. Bright and Contrast are how you steer.",
   "Trap locks a picture in the loop. Double-tap the screen. Then go as far as it will take you.",
 ];
@@ -141,7 +143,8 @@ function startSession(id: string): void {
 }
 
 function surpriseSession(): void {
-  const others = SESSIONS.filter((s) => s.id !== currentSession);
+  const pool = familyFilter === "all" ? SESSIONS : SESSIONS.filter((s) => s.family === familyFilter);
+  const others = pool.filter((s) => s.id !== currentSession);
   const pick = others[Math.floor(Math.random() * others.length)] ?? SESSIONS[0];
   startSession(pick.id);
 }
@@ -163,18 +166,42 @@ function advanceCoach(): void {
 }
 
 function buildSessions(): void {
+  startFilters.replaceChildren();
+  for (const fam of FAMILIES) {
+    const f = document.createElement("button");
+    f.type = "button";
+    f.className = `start-filter${fam.id === familyFilter ? " on" : ""}`;
+    f.textContent = fam.label;
+    f.addEventListener("click", () => {
+      familyFilter = fam.id;
+      buildSessions();
+    });
+    startFilters.append(f);
+  }
+
   sessionsEl.replaceChildren();
   const surprise = document.createElement("button");
   surprise.type = "button";
-  surprise.className = "session-chip surprise";
-  surprise.innerHTML = `<b>Wild card</b>Surprise me`;
+  surprise.className = "start-card surprise";
+  surprise.innerHTML = `<span class="start-thumb start-thumb-empty">?</span><b>Wild card</b><span>Surprise me</span>`;
   surprise.addEventListener("click", surpriseSession);
   sessionsEl.append(surprise);
-  for (const sess of SESSIONS) {
+
+  const shown =
+    familyFilter === "all" ? SESSIONS : SESSIONS.filter((s) => s.family === familyFilter);
+  for (const sess of shown) {
     const b = document.createElement("button");
     b.type = "button";
-    b.className = `session-chip${sess.id === currentSession ? " on" : ""}`;
-    b.innerHTML = `<b>${sess.tag}</b>${sess.name}`;
+    b.className = `start-card${sess.id === currentSession ? " on" : ""}`;
+    const thumb = document.createElement("canvas");
+    thumb.className = "start-thumb";
+    thumb.width = 128;
+    thumb.height = 128;
+    paintSeed(thumb.getContext("2d")!, sess.seed);
+    const meta = document.createElement("span");
+    meta.className = "start-meta";
+    meta.innerHTML = `<b>${sess.tag}</b>${sess.name}`;
+    b.append(thumb, meta);
     b.addEventListener("click", () => startSession(sess.id));
     sessionsEl.append(b);
   }
@@ -242,15 +269,7 @@ function buildDesk(): void {
   const seedBody = seed.querySelector(".rack-body")!;
   seedBody.append(
     select(
-      [
-        { label: "Tiles / monitors", value: "grid" },
-        { label: "Color burst", value: "burst" },
-        { label: "Plasma", value: "plasma" },
-        { label: "Sun", value: "sun" },
-        { label: "Glyphs / poem", value: "glyphs" },
-        { label: "Noise", value: "noise" },
-        { label: "Fair captive", value: "portrait" },
-      ],
+      SEED_LABELS,
       seedKind,
       (v) => {
         seedKind = v as SeedKind;
