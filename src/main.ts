@@ -50,9 +50,9 @@ function isPhone(): boolean {
 
 function pulseSeed(presetId: string): void {
   herder.clear();
-  if (presetId === "fair-captive") herder.inject(0);
+  if (presetId === "fair-captive") herder.inject(0.45);
   else if (presetId === "first-light" || presetId === "jellyfish") herder.inject(0.85);
-  else herder.inject(0.35);
+  else herder.inject(0.6);
 }
 
 function hidePanHint(): void {

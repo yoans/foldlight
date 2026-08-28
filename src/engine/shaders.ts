@@ -132,7 +132,8 @@ vec2 monitorUV(vec2 uv, float scale, float ang, vec2 offset) {
 
 vec3 readMonitor(sampler2D tex, vec2 suv) {
   if (suv.x <= 0.0 || suv.x >= 1.0 || suv.y <= 0.0 || suv.y >= 1.0) {
-    return vec3(0.0);
+    float keep = mix(0.78, 0.2, smoothstep(1.0, 5.0, uFolds));
+    return texture(uPrev, vUv).rgb * keep;
   }
   float bz =
     smoothstep(0.0, 0.008, suv.x) *
@@ -199,17 +200,17 @@ void main() {
     }
 
     if (!(i == 1 && uBottomSrc == 0)) {
-      c = mix(c, readMonitor(uSeed, suv), max(uSeedAmt, uSeedPulse * 0.35));
+      c = mix(c, readMonitor(uSeed, suv), max(uSeedAmt, uSeedPulse * 0.5));
     }
 
-    c *= pow(max(uCopyFalloff, 0.2), float(i));
+    c *= pow(max(uCopyFalloff, 0.45), float(i));
 
     if (i == 1) c = grade(c, uHue2 + uHueDrift * 0.5, uSat2, uBright2, uContrast2, uGamma);
     else c = grade(c, uHue + uHueDrift, uSat, uBright, uContrast, uGamma);
 
     if (i == 0) acc = c;
-    else if (i == 1) acc = mix(acc, mix(max(acc, c), screenBlend(acc, c), 0.4), uGlassMix);
-    else acc = max(acc, c);
+    else if (i == 1) acc = mix(acc, mix(max(acc, c), screenBlend(acc, c), 0.72), uGlassMix);
+    else acc = mix(max(acc, c), screenBlend(acc, c), 0.32);
   }
 
   // Hardware with one camera still has a glass second monitor even when folds == 1
@@ -224,12 +225,12 @@ void main() {
     else if (uBottomSrc == 2) c = mix(readMonitor(uPrev, suv), readMonitor(uOther, suv), uOtherAmt);
     else c = readMonitor(uPrev, suv);
     c = grade(c, uHue2 + uHueDrift * 0.5, uSat2, uBright2, uContrast2, uGamma);
-    acc = mix(acc, mix(max(acc, c), screenBlend(acc, c), 0.4), uGlassMix);
+    acc = mix(acc, mix(max(acc, c), screenBlend(acc, c), 0.72), uGlassMix);
   }
 
   if (uDelayAmt > 0.001) {
     vec2 suv = monitorUV(uv, uZoom, uRotate, uPan);
-    acc = mix(acc, readMonitor(uDelay, suv), uDelayAmt * 0.65);
+    acc = mix(acc, readMonitor(uDelay, suv), uDelayAmt * 0.8);
   }
 
   if (uSmear > 0.001) {
@@ -271,8 +272,8 @@ void main() {
   }
 
   float live = luma(acc);
-  float rescue = (1.0 - smoothstep(0.0, 0.03, live)) * 0.1;
-  acc = mix(acc, src * 0.5, rescue);
+  float rescue = (1.0 - smoothstep(0.0, 0.055, live)) * 0.2;
+  acc = mix(acc, src * 0.8, rescue);
 
   float nse = fract(sin(dot(uv * uRes + vec2(uTime * 19.7, uPhase), vec2(12.9898, 78.233))) * 43758.5453);
   acc += (nse - 0.5) * uNoise;
@@ -289,11 +290,12 @@ void main() {
   }
 
   vec3 old = texture(uPrev, uv).rgb;
-  acc = mix(acc, old, uPersist);
+  acc = mix(acc, old * 0.99, uPersist);
   acc *= uDecay * uFeedbackAmt;
 
   float l = luma(acc);
-  acc *= mix(1.0, 0.52 / max(l, 0.06), smoothstep(0.42, 0.92, l));
+  acc *= mix(1.1, 1.0, smoothstep(0.05, 0.2, l));
+  acc *= mix(1.0, 0.74 / max(l, 0.08), smoothstep(0.78, 1.2, l));
 
   fragColor = vec4(clamp(acc, 0.0, 1.0), 1.0);
 }
