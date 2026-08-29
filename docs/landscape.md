@@ -31,6 +31,7 @@ Five questions that actually matter for *this* homage, not for “best VJ tool�
 | **Hydra** (Olivia Jack) | Browser live-coding video synth. WebGL, WebRTC jams. Inspired by analog modular *and* Crutchfield. | No | You can patch feedback; not named trap/glass/insanity | Yes, legendary | Gallery of sketches, still code | Yes, if you write | Better general instrument. Worse as a Blair fan toy. |
 | **zissl / Hydra-on-WebGPU** | Same language, new GPU path | No | Same as Hydra | Modern browsers | Same | Same | Engine, not an homage. |
 | **TouchDesigner / Max+Jitter** | Pro VJ / installation. Feedback TOPs, `jit.rota`. | No | You *can* rebuild his graph | Paid, steep | Your patch | Unlimited | Nobody ships Blair’s desk as a toy. |
+| **Photism** (Alec Hollingsworth / illoh) | Audio-reactive browser + Ableton visuals. Scenes, palettes, listen-to-a-track. | No | None. Music-first, not glass IFS. | Browser try + $19 Live device | Scene board + palettes | Macros | Cousin for *play*. We took Listen / Looks / Full, not the Mandelbulb scenes. [photism.app](https://photism.app/) |
 | **Lumen** (Paracosm, Mac, ~$129) | Semi-modular analog-style video synth. Syphon, webcam, MIDI, 150+ patches. | No | Feedback patches exist | Mac app | Preset library | Patch bay | Closest “instrument” cousin. Not his topology, not free, not phone. |
 | **Chromatose** (iOS) | Touch-first modular video synth. Metal, MIDI, AirPlay, 4K. | No | Generators + FX, not glass IFS | Phone-native | Learn in an hour | Modular, capped on free tier | Wins “trippy phone synth.” Loses “this is the Light Herder’s loop.” |
 | **Shadertoy / p5 FBOs / VEDA / The Force** | Demo-scene ping-pong, live GLSL | No | Buffers and tunnels | Browser / editor | Examples | If you code | You must write the shader. No homage. |
@@ -40,7 +41,7 @@ Five questions that actually matter for *this* homage, not for “best VJ tool�
 | **Academic OFS** | TV + mirrors as analog IFS (2008+ papers) | Yes | Closest physics papers | Lab | Papers | — | Not a fan instrument. |
 | **This homage** | GPU ping-pong of *his* graph, named knobs, sessions + console | No | Deliberately yes | Browser, PWA, 540p on phones | Nine sessions + coach | Full desk in Console | Only sharp edge: Blair’s device in the browser, honest about not being analog. |
 
-**Honest score:** Hydra, Lumen, Chromatose, and TouchDesigner are “better” as general visual instruments. Blair’s machine is “better” as physics. Electric Sheep is “better” as a communal fractal culture. This project does not compete with those on their terms.
+**Honest score:** Hydra, Lumen, Chromatose, and TouchDesigner are “better” as general visual instruments. Photism is “better” as music-reactive shareable clips. Blair’s machine is “better” as physics. Electric Sheep is “better” as a communal fractal culture. This project does not compete with those on their terms.
 
 This project only makes sense as **his topology, in a browser, with the knobs named after his moves**, plus a path for someone who is not a live-coder.
 

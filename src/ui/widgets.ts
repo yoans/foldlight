@@ -77,6 +77,10 @@ export class Knob {
     return this.value;
   }
 
+  get isDragging(): boolean {
+    return this.dragging;
+  }
+
   private render(): void {
     const t = (this.value - this.opts.min) / (this.opts.max - this.opts.min);
     const ang = -135 + t * 270;

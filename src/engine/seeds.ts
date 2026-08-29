@@ -41,7 +41,59 @@ function hash(i: number): number {
   return x - Math.floor(x);
 }
 
+function applyAperture(ctx: CanvasRenderingContext2D, kind: SeedKind): void {
+  const w = ctx.canvas.width;
+  const h = ctx.canvas.height;
+  const cx = w * 0.5;
+  const cy = h * 0.5;
+  ctx.save();
+  ctx.globalCompositeOperation = "destination-in";
+  ctx.filter = `blur(${Math.max(10, w * 0.022)}px)`;
+  ctx.fillStyle = "#fff";
+  ctx.beginPath();
+  if (kind === "sun" || kind === "bloom" || kind === "rings" || kind === "burst") {
+    ctx.arc(cx, cy, Math.min(w, h) * 0.4, 0, Math.PI * 2);
+  } else if (kind === "glyphs" || kind === "portrait") {
+    ctx.ellipse(cx, cy, w * 0.36, h * 0.42, 0.08, 0, Math.PI * 2);
+  } else if (kind === "chevrons") {
+    const r = Math.min(w, h) * 0.42;
+    for (let i = 0; i <= 6; i++) {
+      const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
+      const x = cx + Math.cos(a) * r;
+      const y = cy + Math.sin(a) * r;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+  } else if (kind === "plasma" || kind === "noise" || kind === "drift") {
+    const steps = 48;
+    for (let i = 0; i <= steps; i++) {
+      const a = (i / steps) * Math.PI * 2;
+      const r = Math.min(w, h) * (0.38 + 0.06 * Math.sin(3 * a) + 0.03 * Math.sin(5 * a + 1.2));
+      const x = cx + Math.cos(a) * r;
+      const y = cy + Math.sin(a) * r;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+  } else {
+    ctx.ellipse(cx, cy, w * 0.4, h * 0.4, 0, 0, Math.PI * 2);
+  }
+  ctx.fill();
+  ctx.restore();
+  ctx.save();
+  ctx.globalCompositeOperation = "destination-over";
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, w, h);
+  ctx.restore();
+}
+
 export function paintSeed(ctx: CanvasRenderingContext2D, kind: SeedKind, t = 0): void {
+  paintSeedBody(ctx, kind, t);
+  applyAperture(ctx, kind);
+}
+
+function paintSeedBody(ctx: CanvasRenderingContext2D, kind: SeedKind, t: number): void {
   const w = ctx.canvas.width;
   const h = ctx.canvas.height;
   ctx.fillStyle = "#000";
@@ -113,14 +165,14 @@ export function paintSeed(ctx: CanvasRenderingContext2D, kind: SeedKind, t = 0):
   if (kind === "glyphs") {
     ctx.fillStyle = "#0a0610";
     ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = "#f4e8c1";
-    ctx.font = `700 ${Math.floor(w / 7)}px Georgia, serif`;
+    ctx.fillStyle = "#fff8e8";
+    ctx.font = `700 ${Math.floor(w / 6.2)}px Georgia, serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     const lines = ["THE FAIR", "CAPTIVE", "RECURSION", "IS THE KEY"];
     lines.forEach((line, i) => ctx.fillText(line, w / 2, h * (0.22 + i * 0.18)));
-    ctx.strokeStyle = "rgba(255,80,40,0.7)";
-    ctx.lineWidth = 14;
+    ctx.strokeStyle = "#ff4a28";
+    ctx.lineWidth = 18;
     ctx.beginPath();
     ctx.ellipse(w * 0.5, h * 0.5, w * 0.38, h * 0.42, 0.1, 0, Math.PI * 2);
     ctx.stroke();
@@ -172,7 +224,7 @@ export function paintSeed(ctx: CanvasRenderingContext2D, kind: SeedKind, t = 0):
         const cy = (y + 0.5) * s;
         const flip = hash(x * 19 + y * 41) > 0.5;
         ctx.strokeStyle = pal[(x + y) % pal.length];
-        ctx.lineWidth = Math.max(3, s * 0.18);
+        ctx.lineWidth = Math.max(4, s * 0.24);
         ctx.beginPath();
         if (flip) {
           ctx.arc(x * s, y * s, s * 0.5, 0, Math.PI / 2);
@@ -239,7 +291,7 @@ export function paintSeed(ctx: CanvasRenderingContext2D, kind: SeedKind, t = 0):
   if (kind === "drift") {
     ctx.fillStyle = "#07060a";
     ctx.fillRect(0, 0, w, h);
-    ctx.lineWidth = Math.max(2, w / 220);
+    ctx.lineWidth = Math.max(3, w / 160);
     ctx.lineCap = "round";
     for (let i = 0; i < 70; i++) {
       let x = hash(i + 3) * w;
@@ -262,7 +314,7 @@ export function paintSeed(ctx: CanvasRenderingContext2D, kind: SeedKind, t = 0):
     ctx.fillStyle = "#0c0a08";
     ctx.fillRect(0, 0, w, h);
     const size = w / 9;
-    const faces = ["#e23d2b", "#7b5cff", "#2ec4b6"];
+    const faces = ["#ff4530", "#8f6cff", "#2ee0c8"];
     const iso = (col: number, row: number, shade: number) => {
       const x = w * 0.5 + (col - row) * size * 0.86;
       const y = h * 0.12 + (col + row) * size * 0.5;
@@ -307,13 +359,13 @@ export function paintSeed(ctx: CanvasRenderingContext2D, kind: SeedKind, t = 0):
       ctx.beginPath();
       ctx.arc(cx, cy, i * (w * 0.028), 0, Math.PI * 2);
       ctx.strokeStyle = `hsla(${200 + i * 8}, 80%, ${40 + (i % 5) * 8}%, 0.9)`;
-      ctx.lineWidth = i % 3 === 0 ? 10 : 3;
+      ctx.lineWidth = i % 3 === 0 ? 16 : 6;
       ctx.stroke();
     }
     for (let i = 0; i < 24; i++) {
       const a = (i / 24) * Math.PI * 2;
       ctx.strokeStyle = "#f4c430";
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 5;
       ctx.beginPath();
       ctx.moveTo(cx + Math.cos(a) * w * 0.08, cy + Math.sin(a) * h * 0.08);
       ctx.lineTo(cx + Math.cos(a) * w * 0.46, cy + Math.sin(a) * h * 0.46);

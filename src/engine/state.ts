@@ -37,7 +37,7 @@ export type DeviceState = {
   linkedRods: boolean;
   insanity: boolean;
   frozen: boolean;
-  fps: 24 | 30 | 60;
+  fps: number;
   view: ViewMode;
   scan: number;
   vignette: number;
@@ -90,8 +90,8 @@ export function loop(partial: Partial<LoopState> = {}): LoopState {
     copyOffX: 0,
     copyOffY: 0,
     folds: 2,
-    delayFrames: 0,
-    delayMix: 0,
+    delayFrames: 4,
+    delayMix: 0.28,
     bottomSrc: 0,
     flipH: false,
     flipV: false,
@@ -115,13 +115,13 @@ export function defaultState(): DeviceState {
     vignette: 0.12,
     mixAB: 0.5,
     gamma: 0.92,
-    noise: 0.016,
+    noise: 0.005,
     aberration: 0.0015,
     persist: 0.16,
     decay: 1,
     barrel: 0.02,
     edge: 0.06,
-    hueDrift: 0.002,
+    hueDrift: 0.0008,
     soft: 0,
     bloom: 0.06,
     smear: 0,

@@ -2,6 +2,9 @@ import { DigitalHerder } from "./engine/device";
 import { PRESETS } from "./engine/presets";
 import { makeSeedCanvas, paintSeed, SEED_LABELS, type SeedKind } from "./engine/seeds";
 import type { DeviceState, LoopState, MonitorKnobs } from "./engine/state";
+import { captureHome, driveHome, type HomePose } from "./engine/evolve";
+import { applyListen, Ear } from "./engine/listen";
+import { applyLook, LOOKS } from "./engine/palettes";
 import { FAMILIES, SESSIONS, type Family } from "./sessions";
 import { btn, Knob, section, toggle } from "./ui/widgets";
 
@@ -14,6 +17,8 @@ const modeEl = document.querySelector<HTMLElement>("#mode")!;
 const sessionsEl = document.querySelector<HTMLElement>("#sessions")!;
 const startFilters = document.querySelector<HTMLElement>("#start-filters")!;
 const playHerd = document.querySelector<HTMLElement>("#play-herd")!;
+const looksEl = document.querySelector<HTMLElement>("#looks")!;
+const listenLed = document.querySelector<HTMLElement>("#listen-led")!;
 const gate = document.querySelector<HTMLElement>("#gate")!;
 const about = document.querySelector<HTMLElement>("#about")!;
 const coach = document.querySelector<HTMLElement>("#coach")!;
@@ -33,14 +38,27 @@ let recording = false;
 let playing = false;
 let rec: DeviceState[] = [];
 let recIndex = 0;
-let currentPreset = "king-glass";
-let currentSession = "king-glass";
+let currentPreset = "fold-90";
+let currentSession = "kaleid";
 let familyFilter: "all" | Family = "all";
 let coachStep = 0;
+let evolveAmt = 0;
+let evolveT0 = 0;
+let home: HomePose | null = null;
+let playScale: Knob | null = null;
+let playTiller: Knob | null = null;
+let playCopy: Knob | null = null;
+let playFolds: Knob | null = null;
+let playDelay: Knob | null = null;
+let playBright: Knob | null = null;
+let listenAmt = 0.85;
+let currentLook: string | null = null;
+const ear = new Ear();
+let listenBtn: HTMLButtonElement | null = null;
 
 const COACH = [
   "Each thumbnail is a different universe. Tap one. Then another. There is no bottom.",
-  "Drag the picture — up, down, left, right — to walk the nest. Scale is depth.",
+  "Most starts sit still so the nest can finish a thought. Turn Evolve if you want it to wander.",
   "Trap locks a picture in the loop. Double-tap the screen. Then go as far as it will take you.",
 ];
 
@@ -50,9 +68,9 @@ function isPhone(): boolean {
 
 function pulseSeed(presetId: string): void {
   herder.clear();
-  if (presetId === "fair-captive") herder.inject(0.45);
-  else if (presetId === "first-light" || presetId === "jellyfish") herder.inject(0.85);
-  else herder.inject(0.6);
+  if (presetId === "first-light" || presetId === "jellyfish") herder.inject(0.7);
+  else if (presetId === "double-glass" || presetId === "insanity") herder.inject(0.62);
+  else herder.inject(0.5);
 }
 
 function hidePanHint(): void {
@@ -104,16 +122,16 @@ function monitorBank(title: string, m: MonitorKnobs): HTMLElement {
 function loopOptics(title: string, L: LoopState): HTMLElement {
   const rack = section(title);
   const body = rack.querySelector(".rack-body")!;
-  addKnob(body, "Scale / rod", 0.34, 0.9, L.zoom, (v) => (L.zoom = v));
+  addKnob(body, "Scale / rod", 0.32, 0.92, L.zoom, (v) => (L.zoom = v));
   addKnob(body, "Tiller", -3.14, 3.14, L.rotate, (v) => (L.rotate = v), (v) => fmt((v * 180) / Math.PI, 0) + "°");
   addKnob(body, "Spin", -1.2, 1.2, L.spin, (v) => (L.spin = v));
   addKnob(body, "Pan X", -0.25, 0.25, L.panX, (v) => (L.panX = v));
   addKnob(body, "Pan Y", -0.25, 0.25, L.panY, (v) => (L.panY = v));
   addKnob(body, "Glass", 0, 1, L.glassMix, (v) => (L.glassMix = v));
-  addKnob(body, "Copy °", -3.14, 3.14, L.copyRotate, (v) => (L.copyRotate = v), (v) => fmt((v * 180) / Math.PI, 0));
-  addKnob(body, "Copy zm", 0.6, 1.4, L.copyScale, (v) => (L.copyScale = v));
+  addKnob(body, "Copy °", -3.14, 3.14, L.copyRotate, (v) => (L.copyRotate = v), (v) => fmt((v * 180) / Math.PI, 0) + "°");
+  addKnob(body, "Copy zm", 0.35, 1.4, L.copyScale, (v) => (L.copyScale = v));
   addKnob(body, "Folds", 1, 8, L.folds, (v) => (L.folds = Math.round(v)), (v) => String(Math.round(v)));
-  addKnob(body, "Delay fr", 0, 7, L.delayFrames, (v) => (L.delayFrames = Math.round(v)), (v) => String(Math.round(v)));
+  addKnob(body, "Delay fr", 0, 30, L.delayFrames, (v) => (L.delayFrames = Math.round(v)), (v) => String(Math.round(v)));
   addKnob(body, "Delay mix", 0, 1, L.delayMix, (v) => (L.delayMix = v));
   body.append(
     toggle("Flip H", L.flipH, (v) => (L.flipH = v)),
@@ -134,20 +152,22 @@ function startSession(id: string): void {
   const p = PRESETS.find((x) => x.id === sess.preset);
   if (!p) return;
   herder.state = p.apply();
-  if (sess.spin != null) herder.state.A.spin = sess.spin;
-  if (Math.abs(herder.state.A.spin) < 0.02) herder.state.A.spin = 0.05;
+  herder.state.A.spin = sess.spin ?? herder.state.A.spin;
   herder.state.feedbackAmt = Math.max(herder.state.feedbackAmt, 1);
+  evolveAmt = sess.evolve ?? 0;
+  home = captureHome(herder.state);
+  currentLook = null;
+  evolveT0 = 0;
   if (isPhone()) herder.resize(540);
-  hint.textContent = `${sess.blurb} Drag the picture to walk it. Smaller Scale = deeper nests.`;
-  playNudge.textContent = `${sess.name} · ${sess.tag}. Drag to pan. Trap locks a picture.`;
+  const moving = evolveAmt >= 0.04;
+  hint.textContent = moving
+    ? `${sess.blurb} Evolve is a slow walk. Drag to pan.`
+    : `${sess.blurb} Sit with it. Turn Evolve if you want it to wander.`;
+  playNudge.textContent = `${sess.name} · ${sess.tag}. ${moving ? "Evolve is a slow walk." : "Evolve is still."}`;
   pulseSeed(sess.preset);
-  if (sess.preset !== "fair-captive") {
-    herder.state.A.bottomSrc = 1;
-    herder.state.B.bottomSrc = 1;
-    herder.state.C.bottomSrc = 1;
-  }
   buildDesk();
   buildPlayHerd();
+  buildLooks();
   buildSessions();
 }
 
@@ -216,13 +236,112 @@ function buildSessions(): void {
   }
 }
 
+function setNestDelay(frames: number): void {
+  const n = Math.round(Math.max(0, Math.min(30, frames)));
+  const mix = n <= 0 ? 0 : 0.28 + (n / 30) * 0.42;
+  for (const L of [herder.state.A, herder.state.B, herder.state.C]) {
+    L.delayFrames = n;
+    L.delayMix = mix;
+  }
+}
+
+function syncPlayKnobs(): void {
+  const A = herder.state.A;
+  if (playScale && !playScale.isDragging) playScale.set(A.zoom, true);
+  if (playTiller && !playTiller.isDragging) playTiller.set(A.rotate, true);
+  if (playCopy && !playCopy.isDragging) playCopy.set(A.copyRotate, true);
+  if (playFolds && !playFolds.isDragging) playFolds.set(A.folds, true);
+  if (playDelay && !playDelay.isDragging) playDelay.set(A.delayFrames, true);
+  if (playBright && !playBright.isDragging) playBright.set(A.top.bright, true);
+}
+
 function buildPlayHerd(): void {
   const A = herder.state.A;
   playHerd.replaceChildren();
-  addKnob(playHerd, "Scale", 0.34, 0.9, A.zoom, (v) => (A.zoom = v));
-  addKnob(playHerd, "Tiller", -3.14, 3.14, A.rotate, (v) => (A.rotate = v), (v) => fmt((v * 180) / Math.PI, 0) + "°");
-  addKnob(playHerd, "Bright", 0, 1.4, A.top.bright, (v) => (A.top.bright = v));
-  addKnob(playHerd, "Contrast", 0.4, 2.2, A.top.contrast, (v) => (A.top.contrast = v));
+  playScale = addKnob(playHerd, "Scale", 0.32, 0.92, home?.zoom ?? A.zoom, (v) => {
+    A.zoom = v;
+    if (home) home.zoom = v;
+  });
+  playTiller = addKnob(playHerd, "Tiller", -3.14, 3.14, home?.rotate ?? A.rotate, (v) => {
+    A.rotate = v;
+    if (home) home.rotate = v;
+  }, (v) => fmt((v * 180) / Math.PI, 0) + "°");
+  playCopy = addKnob(playHerd, "Copy °", -6.28, 6.28, home?.copyRotate ?? A.copyRotate, (v) => {
+    A.copyRotate = v;
+    if (home) home.copyRotate = v;
+  }, (v) => fmt((v * 180) / Math.PI, 0) + "°");
+  playFolds = addKnob(playHerd, "Folds", 1, 8, home?.folds ?? A.folds, (v) => {
+    const n = Math.round(v);
+    A.folds = n;
+    if (home) home.folds = n;
+  }, (v) => String(Math.round(v)));
+  playBright = addKnob(playHerd, "Bright", 0, 1.4, A.top.bright, (v) => {
+    A.top.bright = v;
+    if (home) home.bright = v;
+  });
+  playDelay = addKnob(
+    playHerd,
+    "Delay",
+    0,
+    30,
+    home?.delayFrames ?? A.delayFrames,
+    (v) => {
+      setNestDelay(v);
+      if (home) home.delayFrames = Math.round(v);
+    },
+    (v) => (Math.round(v) <= 0 ? "now" : `${Math.round(v)} fr`),
+  );
+  addKnob(playHerd, "Evolve", 0, 1, evolveAmt, (v) => (evolveAmt = v), (v) => (v < 0.04 ? "still" : v >= 0.97 ? "full" : fmt(v)));
+}
+
+function buildLooks(): void {
+  looksEl.replaceChildren();
+  for (const look of LOOKS) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = `look${currentLook === look.id ? " on" : ""}`;
+    b.innerHTML = `<i style="background:${look.swatch}"></i>${look.name}`;
+    b.addEventListener("click", () => {
+      currentLook = look.id;
+      applyLook(herder.state, look, home);
+      buildLooks();
+    });
+    looksEl.append(b);
+  }
+}
+
+async function toggleListen(): Promise<void> {
+  if (ear.live) {
+    ear.stop();
+    listenBtn?.classList.remove("on");
+    listenLed.classList.add("hidden");
+    return;
+  }
+  try {
+    await ear.mic();
+    listenBtn?.classList.add("on");
+    listenLed.classList.remove("hidden");
+    hint.textContent = "Listening. Bass pulls Scale in. Kicks inject light. Drop a song on the picture to use that instead.";
+  } catch {
+    hint.textContent = "Mic blocked. Drop an audio file on the picture, or pick Song.";
+  }
+}
+
+async function listenFile(file: File): Promise<void> {
+  try {
+    await ear.file(file);
+    listenBtn?.classList.add("on");
+    listenLed.classList.remove("hidden");
+    hint.textContent = `Playing ${file.name}. Bass herds Scale. Kicks inject.`;
+  } catch {
+    hint.textContent = "Could not play that file.";
+  }
+}
+
+function goFull(): void {
+  const box = canvas.closest(".bezel") ?? canvas;
+  if (document.fullscreenElement) void document.exitFullscreen();
+  else void box.requestFullscreen();
 }
 
 function select(opts: { label: string; value: string }[], value: string, onChange: (v: string) => void): HTMLSelectElement {
@@ -257,16 +376,10 @@ function buildDesk(): void {
         const p = PRESETS.find((x) => x.id === id);
         if (!p) return;
         herder.state = p.apply();
-        if (Math.abs(herder.state.A.spin) < 0.02) herder.state.A.spin = 0.05;
         hint.textContent = p.hint;
         buildDesk();
         buildPlayHerd();
         pulseSeed(id);
-        if (id !== "fair-captive") {
-          herder.state.A.bottomSrc = 1;
-          herder.state.B.bottomSrc = 1;
-          herder.state.C.bottomSrc = 1;
-        }
       },
     ),
   );
@@ -365,7 +478,7 @@ function buildDesk(): void {
         { label: "24 fps stutter", value: "24" },
       ],
       String(S.fps),
-      (v) => (S.fps = Number(v) as 24 | 30 | 60),
+      (v) => (S.fps = Number(v)),
     ),
     select(
       [
@@ -380,6 +493,8 @@ function buildDesk(): void {
     toggle("Insanity", S.insanity, (v) => (S.insanity = v)),
     toggle("Quantize cuts", S.quantize, (v) => (S.quantize = v)),
   );
+  addKnob(viewBody, "Evolve", 0, 1, evolveAmt, (v) => (evolveAmt = v), (v) => (v < 0.04 ? "still" : v >= 0.97 ? "full" : fmt(v)));
+  addKnob(viewBody, "Listen", 0, 1, listenAmt, (v) => (listenAmt = v), (v) => (v < 0.04 ? "off" : fmt(v)));
   addKnob(viewBody, "Mix A/B", 0, 1, S.mixAB, (v) => (S.mixAB = v));
   addKnob(viewBody, "BPM", 40, 200, S.bpm, (v) => (S.bpm = v), (v) => String(Math.round(v)));
   addKnob(viewBody, "Cut len", 0.02, 0.9, S.cutLen, (v) => (S.cutLen = v));
@@ -474,10 +589,59 @@ function buildTransport(): void {
       a.click();
     }),
   );
+  listenBtn = btn("Listen", "play-keep", () => {
+    void toggleListen();
+  });
+  transport.append(listenBtn);
+  const song = document.createElement("label");
+  song.className = "act file play-keep";
+  song.textContent = "Song";
+  const songIn = document.createElement("input");
+  songIn.type = "file";
+  songIn.accept = "audio/*";
+  songIn.addEventListener("change", () => {
+    const f = songIn.files?.[0];
+    if (f) void listenFile(f);
+  });
+  song.append(songIn);
+  transport.append(song);
+  transport.append(btn("Full", "play-keep", goFull));
 }
 
 buildTransport();
-startSession("king-glass");
+
+const params = new URLSearchParams(location.search);
+if (params.has("eval")) {
+  gate.classList.add("hidden");
+  localStorage.setItem("dlh-coached", "1");
+  coach.classList.add("hidden");
+  panHint.classList.add("gone");
+}
+
+startSession(params.get("session") ?? "kaleid");
+
+Object.assign(window, {
+  __foldlight: {
+    start: startSession,
+    ids: () => SESSIONS.map((s) => s.id),
+    pose: () => {
+      const A = herder.state.A;
+      const S = herder.state;
+      return {
+        zoom: A.zoom,
+        rotate: A.rotate,
+        copyRotate: A.copyRotate,
+        copyScale: A.copyScale,
+        folds: A.folds,
+        delay: A.delayFrames,
+        glass: A.glassMix,
+        smear: S.smear,
+        kaleido: S.kaleido,
+        hue: A.top.hue,
+      };
+    },
+  },
+});
 
 document.querySelector("#enter")?.addEventListener("click", () => {
   gate.classList.add("hidden");
@@ -519,8 +683,14 @@ canvas.addEventListener("pointerdown", (e) => {
 });
 canvas.addEventListener("pointermove", (e) => {
   if (!e.buttons) return;
-  herder.state.A.panX += e.movementX * 0.0015;
-  herder.state.A.panY -= e.movementY * 0.0015;
+  const dx = e.movementX * 0.0015;
+  const dy = -e.movementY * 0.0015;
+  herder.state.A.panX += dx;
+  herder.state.A.panY += dy;
+  if (home) {
+    home.panX += dx;
+    home.panY += dy;
+  }
   hidePanHint();
 });
 let lastTap = 0;
@@ -531,6 +701,12 @@ canvas.addEventListener("pointerup", (e) => {
   lastTap = t;
 });
 canvas.addEventListener("dblclick", () => herder.trap("all"));
+canvas.addEventListener("dragover", (e) => e.preventDefault());
+canvas.addEventListener("drop", (e) => {
+  e.preventDefault();
+  const f = e.dataTransfer?.files[0];
+  if (f?.type.startsWith("audio")) void listenFile(f);
+});
 
 window.addEventListener("keydown", (e) => {
   if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
@@ -539,32 +715,48 @@ window.addEventListener("keydown", (e) => {
     e.preventDefault();
     herder.trap("all");
   }
-  if (e.key === "i") herder.state.insanity = !herder.state.insanity;
+  if (e.key === "l") void toggleListen();
   if (e.key === "f") herder.state.frozen = !herder.state.frozen;
   if (e.key === "r") {
     herder.clear();
     herder.inject(0.8);
   }
-  if (e.key === "q") A.rotate -= 0.04;
-  if (e.key === "e") A.rotate += 0.04;
-  if (e.key === "w") A.zoom = Math.min(0.9, A.zoom + 0.01);
-  if (e.key === "s") A.zoom = Math.max(0.34, A.zoom - 0.01);
+  if (e.key === "q") {
+    A.rotate -= 0.04;
+    if (home) home.rotate -= 0.04;
+  }
+  if (e.key === "e") {
+    A.rotate += 0.04;
+    if (home) home.rotate += 0.04;
+  }
+  if (e.key === "w") {
+    A.zoom = Math.min(0.92, A.zoom + 0.01);
+    if (home) home.zoom = A.zoom;
+  }
+  if (e.key === "s") {
+    A.zoom = Math.max(0.34, A.zoom - 0.01);
+    if (home) home.zoom = A.zoom;
+  }
   if (e.key === "a" || e.key === "ArrowLeft") {
     A.panX -= 0.01;
+    if (home) home.panX -= 0.01;
     hidePanHint();
   }
   if (e.key === "d" || e.key === "ArrowRight") {
     A.panX += 0.01;
+    if (home) home.panX += 0.01;
     hidePanHint();
   }
   if (e.key === "ArrowUp") {
     e.preventDefault();
     A.panY += 0.01;
+    if (home) home.panY += 0.01;
     hidePanHint();
   }
   if (e.key === "ArrowDown") {
     e.preventDefault();
     A.panY -= 0.01;
+    if (home) home.panY -= 0.01;
     hidePanHint();
   }
   if (e.key >= "1" && e.key <= "9") {
@@ -590,8 +782,20 @@ function loop(now: number): void {
     live.noise = snap.noise;
     live.hueDrift = snap.hueDrift;
     live.decay = snap.decay;
+  } else if (home && !herder.state.frozen) {
+    const evolving = evolveAmt >= 0.04;
+    if (evolving) {
+      if (!evolveT0) evolveT0 = now;
+      driveHome(herder.state, home, (now - evolveT0) / 1000, evolveAmt);
+    }
+    if (ear.live && listenAmt >= 0.04) {
+      const bands = ear.poll(now);
+      applyListen(herder.state, home, bands, listenAmt, !evolving);
+      if (bands.kick) herder.inject(0.55);
+    }
   }
   herder.tick(now);
+  syncPlayKnobs();
   frames++;
   if (now - fpsT > 500) {
     const fps = Math.round((frames * 1000) / (now - fpsT));

@@ -11,7 +11,7 @@ import {
 import { FEEDBACK_FRAG, PRESENT_FRAG, VERT } from "./shaders";
 import { defaultState, type DeviceState, type LoopState } from "./state";
 
-const DELAY_LEN = 8;
+const DELAY_LEN = 32;
 
 type LoopGpu = {
   ring: Target[];
