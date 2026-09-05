@@ -105,7 +105,10 @@ vec3 grade(vec3 col, float hue, float sat, float br, float con, float gam) {
   hsv.y = clamp(hsv.y * sat, 0.0, 2.5);
   hsv.z *= br;
   col = hsv2rgb(hsv);
-  col = (col - 0.5) * con + 0.5;
+  // Camera black level: the grey that deep generations average to dies here,
+  // while anything with real colour in one channel survives.
+  col = max(col - 0.015, 0.0) * 1.015;
+  col = (col - 0.42) * con + 0.42;
   col = pow(max(col, vec3(0.0)), vec3(max(gam, 0.05)));
   return col;
 }
@@ -130,26 +133,40 @@ vec2 monitorUV(vec2 uv, float scale, float ang, vec2 offset) {
   return p + 0.5;
 }
 
-vec3 readMonitor(sampler2D tex, vec2 suv) {
-  vec2 q = suv * 2.0 - 1.0;
-  float apo = pow(abs(q.x), 2.45) + pow(abs(q.y), 2.45);
-  float gate = 1.0 - smoothstep(0.58, 1.02, apo);
-  if (gate < 0.004) {
-    float keep = mix(0.94, 0.42, smoothstep(1.0, 6.0, uFolds));
-    return texture(uPrev, vUv).rgb * keep;
-  }
-  vec3 col;
+// Where a monitor is. A rectangle with a short feather so it never draws a hard line.
+// Black is transparent: a copy contributes only where it has light, so the picture's
+// shape comes from what is on the monitors, never from this mask.
+float monitorGate(vec2 suv) {
+  vec2 q = abs(suv * 2.0 - 1.0);
+  return 1.0 - smoothstep(0.9, 1.0, max(q.x, q.y));
+}
+
+vec3 sampleMonitor(sampler2D tex, vec2 suv) {
   if (uAberration > 0.0001) {
     vec2 dir = (suv - 0.5) * uAberration;
-    col = vec3(
+    return vec3(
       texture(tex, suv + dir).r,
       texture(tex, suv).g,
       texture(tex, suv - dir).b
     );
-  } else {
-    col = texture(tex, suv).rgb;
   }
-  return col * gate;
+  return texture(tex, suv).rgb;
+}
+
+// A copy on the glass. Outside its monitor there is nothing.
+vec3 readMonitor(sampler2D tex, vec2 suv) {
+  float gate = monitorGate(suv);
+  if (gate < 0.004) return vec3(0.0);
+  return sampleMonitor(tex, suv) * gate;
+}
+
+// The main monitor. Outside it, the old frame lingers and fades instead of cutting to black.
+vec3 readBase(sampler2D tex, vec2 suv) {
+  float gate = monitorGate(suv);
+  float keep = mix(0.94, 0.42, smoothstep(1.0, 6.0, uFolds));
+  vec3 ghost = texture(uPrev, vUv).rgb * keep;
+  if (gate < 0.004) return ghost;
+  return mix(ghost, sampleMonitor(tex, suv), gate);
 }
 
 void main() {
@@ -179,6 +196,16 @@ void main() {
   int folds = int(clamp(uFolds, 1.0, 8.0));
   float stepA = abs(uCopyRotate) > 0.001 ? uCopyRotate : TAU / max(uFolds, 1.0);
 
+  // Where the second monitor sits; the seed rescue below goes through this so it
+  // arrives nested, never as a full-frame overlay.
+  vec2 suvSeed;
+  {
+    float sc = uZoom * uCopyScale;
+    float a = uRotate + stepA;
+    float spread = (1.0 - sc) * 0.5;
+    suvSeed = monitorUV(uv, sc, a, uPan + rot2(vec2(uCopyOffset.x, spread + uCopyOffset.y), a));
+  }
+
   vec3 acc = vec3(0.0);
   for (int i = 0; i < 8; i++) {
     if (i >= folds) break;
@@ -189,7 +216,9 @@ void main() {
     vec2 suv = monitorUV(uv, sc, a, off);
 
     vec3 c;
-    if (i == 1 && uBottomSrc == 0) {
+    if (i == 0) {
+      c = readBase(uPrev, suv);
+    } else if (i == 1 && uBottomSrc == 0) {
       c = readMonitor(uSeed, suv);
     } else if (i == 1 && uBottomSrc == 2) {
       c = mix(readMonitor(uPrev, suv), readMonitor(uOther, suv), uOtherAmt);
@@ -207,8 +236,8 @@ void main() {
     else c = grade(c, uHue + uHueDrift, uSat, uBright, uContrast, uGamma);
 
     if (i == 0) acc = c;
-    else if (i == 1) acc = mix(acc, mix(max(acc, c), screenBlend(acc, c), 0.85), uGlassMix);
-    else acc = mix(max(acc, c), screenBlend(acc, c), 0.5);
+    else if (i == 1) acc = mix(acc, mix(max(acc, c), screenBlend(acc, c), 0.7), uGlassMix);
+    else acc = mix(max(acc, c), screenBlend(acc, c), 0.45);
   }
 
   // Hardware with one camera still has a glass second monitor even when folds == 1
@@ -223,30 +252,33 @@ void main() {
     else if (uBottomSrc == 2) c = mix(readMonitor(uPrev, suv), readMonitor(uOther, suv), uOtherAmt);
     else c = readMonitor(uPrev, suv);
     c = grade(c, uHue2 + uHueDrift * 0.5, uSat2, uBright2, uContrast2, uGamma);
-    acc = mix(acc, mix(max(acc, c), screenBlend(acc, c), 0.85), uGlassMix);
+    acc = mix(acc, mix(max(acc, c), screenBlend(acc, c), 0.7), uGlassMix);
   }
 
+  // The late frame is another light on the glass: it adds where it is lit, nothing where it is dark.
   if (uDelayAmt > 0.001) {
     vec2 suv = monitorUV(uv, uZoom, uRotate, uPan);
-    acc = mix(acc, readMonitor(uDelay, suv), uDelayAmt * 0.8);
+    vec3 d = readMonitor(uDelay, suv);
+    acc = mix(acc, mix(max(acc, d), screenBlend(acc, d), 0.5), uDelayAmt * 0.8);
   }
 
+  // Full-frame reads below are ungated: they must not stamp a shape on the picture.
   if (uSmear > 0.001) {
     vec2 vel = rot2(vec2(0.0, 1.0), uRotate) * uSmear * 0.008;
-    acc = mix(acc, readMonitor(uPrev, uv + vel), 0.35);
+    acc = mix(acc, texture(uPrev, uv + vel).rgb, 0.35);
   }
 
   if (uEdge > 0.001) {
-    acc += (abs(dFdx(acc)) + abs(dFdy(acc))) * uEdge * 2.4;
+    acc += (abs(dFdx(acc)) + abs(dFdy(acc))) * uEdge * 1.3;
   }
 
   if (uBloom > 0.001) {
     vec2 px = 2.5 / uRes;
     vec3 b =
-      readMonitor(uPrev, uv + vec2(px.x, 0.0)) +
-      readMonitor(uPrev, uv - vec2(px.x, 0.0)) +
-      readMonitor(uPrev, uv + vec2(0.0, px.y)) +
-      readMonitor(uPrev, uv - vec2(0.0, px.y));
+      texture(uPrev, uv + vec2(px.x, 0.0)).rgb +
+      texture(uPrev, uv - vec2(px.x, 0.0)).rgb +
+      texture(uPrev, uv + vec2(0.0, px.y)).rgb +
+      texture(uPrev, uv - vec2(0.0, px.y)).rgb;
     acc += max(b * 0.25 - 0.4, 0.0) * uBloom;
   }
 
@@ -254,10 +286,10 @@ void main() {
     vec2 px = uSoft / uRes;
     acc =
       acc * 0.55 +
-      readMonitor(uPrev, uv + vec2(px.x, 0.0)) * 0.1125 +
-      readMonitor(uPrev, uv - vec2(px.x, 0.0)) * 0.1125 +
-      readMonitor(uPrev, uv + vec2(0.0, px.y)) * 0.1125 +
-      readMonitor(uPrev, uv - vec2(0.0, px.y)) * 0.1125;
+      texture(uPrev, uv + vec2(px.x, 0.0)).rgb * 0.1125 +
+      texture(uPrev, uv - vec2(px.x, 0.0)).rgb * 0.1125 +
+      texture(uPrev, uv + vec2(0.0, px.y)).rgb * 0.1125 +
+      texture(uPrev, uv - vec2(0.0, px.y)).rgb * 0.1125;
   }
 
   vec3 src = texture(uSeed, uv).rgb;
@@ -269,9 +301,11 @@ void main() {
     acc = mix(acc, src, k);
   }
 
+  // If the loop has gone dark, let the seed back in — nested on the second monitor,
+  // not stamped across the frame.
   float live = luma(acc);
-  float rescue = (1.0 - smoothstep(0.0, 0.07, live)) * 0.28;
-  acc = mix(acc, src * 0.9, rescue);
+  float rescue = (1.0 - smoothstep(0.0, 0.09, live)) * 0.36;
+  acc = mix(acc, readMonitor(uSeed, suvSeed) * 0.9, rescue);
 
   float nse = fract(sin(dot(uv * uRes + vec2(uTime * 19.7, uPhase), vec2(12.9898, 78.233))) * 43758.5453);
   acc += (nse - 0.5) * uNoise;
@@ -291,9 +325,15 @@ void main() {
   acc = mix(acc, old * 0.995, uPersist);
   acc *= uDecay * uFeedbackAmt;
 
+  // Stable middle: lift the dim generations so the nest stays lit,
+  // hold the bright ones so it never floods to white. Pure black stays black.
   float l = luma(acc);
-  acc *= mix(1.14, 1.0, smoothstep(0.04, 0.18, l));
-  acc *= mix(1.0, 0.78 / max(l, 0.08), smoothstep(0.88, 1.28, l));
+  float lift = mix(1.2, 1.0, smoothstep(0.05, 0.46, l));
+  float hold = mix(1.0, 0.66 / max(l, 0.1), smoothstep(0.58, 1.05, l));
+  acc *= lift * hold;
+  // Glass stacks wash toward grey; pull the chroma back as it brightens.
+  float gray = luma(acc);
+  acc = mix(vec3(gray), acc, 1.0 + 0.35 * smoothstep(0.4, 0.75, gray));
 
   fragColor = vec4(clamp(acc, 0.0, 1.0), 1.0);
 }

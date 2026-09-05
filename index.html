@@ -36,28 +36,6 @@
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body class="mode-play">
-    <div id="gate" class="gate">
-      <div class="gate-inner">
-        <p class="kicker">Infinite nested light</p>
-        <h1>Foldlight</h1>
-        <p class="lede">
-          Two monitors through glass. Copies inside copies, with no last copy.
-          Trap a picture. Steer Scale, Bright, Contrast. Open the console when you
-          want the whole desk.
-        </p>
-        <div class="gate-actions">
-          <button type="button" class="act cut" id="enter">Begin</button>
-          <button type="button" class="act" id="open-about-gate">Field notes</button>
-        </div>
-        <p class="gate-links">
-          After
-          <a href="https://www.thelightherder.com/" target="_blank" rel="noreferrer">Dave Blair’s Light Herder</a>
-          and
-          <a href="https://sweetandfizzy.com/fractals/" target="_blank" rel="noreferrer">Peter King’s 1997 glass</a>
-        </p>
-      </div>
-    </div>
-
     <div id="about" class="about hidden" role="dialog" aria-labelledby="about-title">
       <div class="about-inner">
         <button type="button" class="act about-close" id="close-about">Close</button>
@@ -119,7 +97,14 @@
           </li>
         </ul>
         <p>
-          Play a session. Open Console for every knob. Surprise me when you want a new universe.
+          Tap a start. Drag the picture to look around. Turn Scale to nest deeper. Trap when you
+          want the picture to live without its source. Tour walks the board for you. Console opens
+          every knob on the machine.
+        </p>
+        <p>
+          Keys: <code>Space</code> trap · <code>N</code>/<code>P</code> next and previous start ·
+          <code>T</code> tour · <code>R</code> reset · <code>L</code> listen · <code>W</code>/<code>S</code>
+          scale · <code>Q</code>/<code>E</code> tiller · arrows pan · <code>1–9</code> jump to a start.
         </p>
         <h3>Write to Dave Blair</h3>
         <p>
@@ -148,14 +133,14 @@
     <div id="app">
       <header>
         <div class="brand">
-          <p class="kicker">Infinite nested light</p>
+          <p class="kicker">Copies inside copies · after Dave Blair’s Light Herder</p>
           <h1>Foldlight</h1>
-          <p class="play-nudge" id="play-nudge">Pick a chip. Sit with the nest. Evolve is still.</p>
+          <p class="play-nudge" id="play-nudge">Two monitors through glass, folded into themselves. Tap a start above.</p>
         </div>
         <div class="header-actions">
-          <button type="button" class="act" id="mode-play">Play</button>
-          <button type="button" class="act" id="mode-console">Console</button>
-          <button type="button" class="act" id="open-about">About</button>
+          <button type="button" class="act" id="mode-play" title="The simple desk: seven knobs and the board of starts.">Play</button>
+          <button type="button" class="act" id="mode-console" title="Every knob on the machine.">Console</button>
+          <button type="button" class="act" id="open-about" title="What this is, who it is after, and how to write to Dave Blair.">About</button>
         </div>
       </header>
 
@@ -173,7 +158,7 @@
               <i class="e" aria-hidden="true"></i>
               <i class="s" aria-hidden="true"></i>
               <i class="w" aria-hidden="true"></i>
-              <span>Drag to walk the nest</span>
+              <span>Drag to look around · double-tap to trap</span>
             </div>
             <div class="pip" id="status">
               <span>LOOP A</span>

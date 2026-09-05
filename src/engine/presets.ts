@@ -1,4 +1,4 @@
-import { defaultState, knobs, loop, type DeviceState } from "./state";
+import { centerNest, defaultState, knobs, loop, type DeviceState } from "./state";
 
 export type Preset = {
   id: string;
@@ -38,7 +38,11 @@ function foldShow(opts: {
 }): DeviceState {
   const s = base();
   const sat = opts.sat ?? 1.28;
-  const con = opts.contrast ?? 1.36;
+  // Per-generation gain near 1: the nest stays lit for many generations.
+  // Wide stacks (5+ glass copies) add up; take a little off the top for them.
+  const stack = opts.folds >= 5 ? 0.97 : 1;
+  const con = Math.min((opts.contrast ?? 1.36) * 0.82, 1.22) * (opts.folds >= 5 ? 1.04 : 1);
+  const br = Math.min(opts.bright * 1.08, 1.06) * stack;
   const hue = opts.hue ?? -0.02;
   s.A = loop({
     zoom: opts.zoom,
@@ -51,15 +55,15 @@ function foldShow(opts: {
     folds: opts.folds,
   });
   s.A.bottomSrc = opts.bottomSrc ?? 0;
-  s.A.top = knobs(hue, sat, opts.bright, con);
-  s.A.bot = knobs(opts.hue2 ?? hue + 0.16, sat * 0.9, opts.bright * 0.92, con * 0.94);
-  s.edge = opts.edge ?? 0.16;
+  s.A.top = knobs(hue, sat, br, con);
+  s.A.bot = knobs(opts.hue2 ?? hue + 0.16, sat * 0.9, br * 0.94, con * 0.96);
+  s.edge = opts.edge ?? 0.1;
   s.persist = opts.persist ?? 0.13;
   s.seedAmt = opts.seedAmt ?? 0.03;
   s.bloom = opts.bloom ?? 0.12;
-  s.gamma = 0.88;
+  s.gamma = 0.96;
   s.vignette = 0.08;
-  s.copyFalloff = opts.copyFalloff ?? (opts.folds >= 4 ? 0.88 : 0.95);
+  s.copyFalloff = opts.folds >= 5 ? 0.88 : opts.folds >= 3 ? 0.92 : 0.97;
   s.hueDrift = opts.hueDrift ?? 0.0008;
   s.noise = 0.004;
   if (opts.kaleido) s.kaleido = opts.kaleido;
@@ -92,25 +96,28 @@ function doubleShow(opts: {
     copyFalloff: 0.9,
     bloom: 0.1,
   });
+  // A nests the seed at full brightness; B nests A. The picture is B: a fractal whose
+  // second monitor holds a whole other fractal.
   s.insanity = true;
-  s.view = 0;
+  s.view = 1;
   s.otherAmt = opts.otherAmt ?? 0.58;
-  s.A.bottomSrc = 1;
+  s.A.bottomSrc = 0;
   s.B = loop({
     zoom: opts.zoomB,
     rotate: -0.1,
-    glassMix: mix,
+    glassMix: 1,
     copyRotate: -Math.PI / 2,
     folds: opts.folds,
   });
-  s.B.top = knobs(0.08, 1.15, opts.bright * 0.95, 1.3);
-  s.B.bot = knobs(0.12, 1.05, opts.bright * 0.88, 1.24);
-  s.B.bottomSrc = 1;
-  s.copyFalloff = 0.9;
+  s.B.top = knobs(0.08, 1.15, opts.bright * 0.98, 1.16);
+  s.B.bot = knobs(0.12, 1.05, opts.bright * 0.94, 1.12);
+  s.B.bottomSrc = 2;
+  s.seedAmt = 0.04;
+  s.copyFalloff = 0.96;
   return s;
 }
 
-export const PRESETS: Preset[] = [
+const RAW: Preset[] = [
   {
     id: "first-light",
     name: "First Light",
@@ -160,24 +167,25 @@ export const PRESETS: Preset[] = [
     hint: "Peter King 1997 — two monitors through 50/50 glass, 90° fold",
     apply: () => {
       const s = base();
+      // Two monitors side by side, camera on the pair: the nest appears inside the right one.
       s.A = loop({
-        zoom: 0.68,
-        rotate: 0.1,
+        zoom: 0.5,
+        rotate: 0.06,
         glassMix: 1,
         copyRotate: Math.PI / 2,
         copyScale: 1,
         folds: 2,
       });
-      s.A.top = knobs(-0.02, 1.08, 0.8, 1.28);
-      s.A.bot = knobs(0.05, 1.02, 0.76, 1.22);
+      s.A.top = knobs(-0.02, 1.16, 1.02, 1.14);
+      s.A.bot = knobs(0.05, 1.08, 0.98, 1.1);
       s.view = 0;
       s.edge = 0.1;
       s.persist = 0.14;
       s.seedAmt = 0.018;
-      s.bloom = 0.04;
-      s.gamma = 0.98;
-      s.vignette = 0.14;
-      s.copyFalloff = 0.9;
+      s.bloom = 0.06;
+      s.gamma = 0.92;
+      s.vignette = 0.1;
+      s.copyFalloff = 0.97;
       s.noise = 0.004;
       return s;
     },
@@ -195,7 +203,7 @@ export const PRESETS: Preset[] = [
         sat: 1.34,
         hue: -0.06,
         hue2: 0.12,
-        edge: 0.18,
+        edge: 0.08,
         persist: 0.12,
         glassMix: 0.5,
       }),
@@ -206,10 +214,10 @@ export const PRESETS: Preset[] = [
     hint: "Three contracted copies — nested triangles",
     apply: () =>
       foldShow({
-        zoom: 0.38,
+        zoom: 0.46,
         folds: 3,
         copyRotate: (Math.PI * 2) / 3,
-        bright: 0.88,
+        bright: 1.0,
         sat: 1.32,
         hue: -0.08,
         hue2: 0.1,
@@ -218,7 +226,7 @@ export const PRESETS: Preset[] = [
         persist: 0.1,
         bloom: 0.08,
         glassMix: 0.46,
-        edge: 0.16,
+        edge: 0.08,
       }),
   },
   {
@@ -230,15 +238,16 @@ export const PRESETS: Preset[] = [
         zoom: 0.52,
         folds: 6,
         copyRotate: Math.PI / 3,
-        bright: 0.92,
+        bright: 1.06,
         sat: 1.38,
         hue: 0.82,
         hue2: 0.08,
         copyFalloff: 0.9,
         persist: 0.12,
-        bloom: 0.26,
+        bloom: 0.14,
         edge: 0.12,
-        glassMix: 0.52,
+        glassMix: 0.7,
+        seedAmt: 0.08,
       }),
   },
   {
@@ -247,14 +256,14 @@ export const PRESETS: Preset[] = [
     hint: "Tiny 90° scale — picture in picture in picture in picture",
     apply: () =>
       foldShow({
-        zoom: 0.36,
+        zoom: 0.44,
         folds: 2,
         copyRotate: Math.PI / 2,
-        bright: 0.9,
+        bright: 1.0,
         sat: 1.3,
         hue: 0.04,
         hue2: 0.22,
-        edge: 0.2,
+        edge: 0.06,
         persist: 0.12,
         glassMix: 0.5,
         copyFalloff: 0.96,
@@ -266,12 +275,12 @@ export const PRESETS: Preset[] = [
     hint: "Loop A writes B writes A — a fractal inside a fractal",
     apply: () =>
       doubleShow({
-        zoomA: 0.48,
-        zoomB: 0.44,
+        zoomA: 0.76,
+        zoomB: 0.62,
         folds: 2,
-        bright: 0.78,
+        bright: 0.98,
         glassMix: 0.45,
-        otherAmt: 0.58,
+        otherAmt: 0.9,
       }),
   },
   {
@@ -302,7 +311,7 @@ export const PRESETS: Preset[] = [
         zoom: 0.42,
         folds: 4,
         copyRotate: Math.PI / 2,
-        bright: 0.86,
+        bright: 0.98,
         sat: 1.28,
         hue: -0.02,
         hue2: 0.18,
@@ -310,7 +319,7 @@ export const PRESETS: Preset[] = [
         persist: 0.1,
         bloom: 0.1,
         glassMix: 0.46,
-        edge: 0.16,
+        edge: 0.08,
       }),
   },
   {
@@ -349,14 +358,14 @@ export const PRESETS: Preset[] = [
         delayMix: 0.16,
       });
       s.A.bottomSrc = 0;
-      s.A.top = knobs(0.01, 1.02, 0.8, 1.22);
-      s.A.bot = knobs(0.02, 0.98, 0.72, 1.18);
+      s.A.top = knobs(0.01, 1.08, 1.0, 1.14);
+      s.A.bot = knobs(0.02, 1.02, 0.94, 1.1);
       s.persist = 0.14;
       s.seedAmt = 0.02;
-      s.bloom = 0.04;
-      s.gamma = 0.98;
-      s.copyFalloff = 0.88;
-      s.vignette = 0.14;
+      s.bloom = 0.06;
+      s.gamma = 0.92;
+      s.copyFalloff = 0.96;
+      s.vignette = 0.1;
       return s;
     },
   },
@@ -367,20 +376,22 @@ export const PRESETS: Preset[] = [
     apply: () => {
       const s = base();
       s.insanity = true;
-      s.A = loop({ zoom: 0.55, rotate: 0.2, glassMix: 1, copyRotate: 1.57, folds: 2 });
-      s.B = loop({ zoom: 0.52, rotate: -0.16, glassMix: 1, copyRotate: -1.4, folds: 2 });
+      // B holds the seed; A nests B. Split view shows both: the nest, and the nest of the nest.
+      s.A = loop({ zoom: 0.62, rotate: 0.2, glassMix: 1, copyRotate: 1.57, folds: 2 });
+      s.B = loop({ zoom: 0.74, rotate: -0.16, glassMix: 1, copyRotate: -1.4, folds: 2 });
       s.A.bottomSrc = 2;
-      s.B.bottomSrc = 2;
-      s.A.top = knobs(-0.04, 1.12, 0.74, 1.26);
-      s.A.bot = knobs(0.02, 1.02, 0.7, 1.2);
-      s.B.top = knobs(0.08, 1.08, 0.72, 1.24);
-      s.B.bot = knobs(0.06, 1.0, 0.68, 1.18);
-      s.view = 4;
-      s.otherAmt = 0.75;
+      s.B.bottomSrc = 0;
+      s.A.top = knobs(-0.04, 1.2, 1.0, 1.14);
+      s.A.bot = knobs(0.02, 1.1, 0.96, 1.1);
+      s.B.top = knobs(0.08, 1.16, 0.98, 1.14);
+      s.B.bot = knobs(0.06, 1.08, 0.94, 1.1);
+      s.view = 0;
+      s.otherAmt = 0.9;
       s.persist = 0.14;
-      s.seedAmt = 0.025;
-      s.bloom = 0.08;
-      s.gamma = 0.98;
+      s.seedAmt = 0.04;
+      s.bloom = 0.1;
+      s.gamma = 0.92;
+      s.copyFalloff = 0.97;
       return s;
     },
   },
@@ -398,17 +409,17 @@ export const PRESETS: Preset[] = [
         copyScale: 1,
         folds: 3,
       });
-      s.A.top = knobs(0.08, 0.85, 0.72, 1.3);
-      s.A.bot = knobs(0.08, 0.8, 0.68, 1.26);
-      s.gamma = 1.02;
-      s.edge = 0.12;
-      s.noise = 0.006;
+      s.A.top = knobs(0.08, 1.2, 0.94, 1.22);
+      s.A.bot = knobs(0.08, 1.1, 0.9, 1.18);
+      s.gamma = 0.98;
+      s.edge = 0.08;
+      s.noise = 0.004;
       s.hueDrift = 0;
       s.bloom = 0.04;
       s.persist = 0.1;
-      s.seedAmt = 0.02;
-      s.vignette = 0.16;
-      s.copyFalloff = 0.84;
+      s.seedAmt = 0.03;
+      s.vignette = 0.12;
+      s.copyFalloff = 0.9;
       return s;
     },
   },
@@ -419,12 +430,13 @@ export const PRESETS: Preset[] = [
     apply: () => {
       const s = base();
       s.A = loop({ zoom: 0.64, rotate: 0.22, spin: 0.03, glassMix: 1, copyRotate: 1.1, copyScale: 1.05, folds: 2 });
-      s.A.top = knobs(0.55, 1.48, 1.0, 1.26);
-      s.A.bot = knobs(0.62, 1.28, 0.94, 1.18);
+      s.A.top = knobs(0.55, 1.48, 1.1, 1.14);
+      s.A.bot = knobs(0.62, 1.28, 1.04, 1.1);
       s.warp = 0.003;
       s.smear = 0.32;
       s.persist = 0.2;
       s.bloom = 0.2;
+      s.gamma = 0.9;
       s.soft = 0.18;
       s.hueDrift = 0.002;
       s.seedAmt = 0.03;
@@ -439,7 +451,7 @@ export const PRESETS: Preset[] = [
     hint: "Two cameras close together — line weather, not a 90° nest",
     apply: () =>
       foldShow({
-        zoom: 0.74,
+        zoom: 0.8,
         folds: 2,
         copyRotate: 0.36,
         copyScale: 0.92,
@@ -450,8 +462,9 @@ export const PRESETS: Preset[] = [
         persist: 0.2,
         bloom: 0.14,
         glassMix: 0.4,
-        edge: 0.08,
+        edge: 0.22,
         smear: 0.4,
+        seedAmt: 0.08,
         warp: 0.002,
         delayFrames: 10,
         rotate: 0.12,
@@ -466,7 +479,7 @@ export const PRESETS: Preset[] = [
         zoom: 0.78,
         folds: 2,
         copyRotate: 0.72,
-        bright: 0.98,
+        bright: 1.04,
         sat: 1.45,
         hue: 0.22,
         hue2: 0.4,
@@ -476,10 +489,10 @@ export const PRESETS: Preset[] = [
         rotate: 0.18,
         persist: 0.12,
         glassMix: 0.48,
-        edge: 0.12,
-        seedAmt: 0.04,
+        edge: 0.08,
+        seedAmt: 0.09,
         bloom: 0.08,
-        bottomSrc: 1,
+        bottomSrc: 0,
       }),
   },
   {
@@ -488,13 +501,15 @@ export const PRESETS: Preset[] = [
     hint: "Overdriven session — delay + hue cycle",
     apply: () => {
       const s = base();
-      s.A = loop({ zoom: 0.57, rotate: 0.28, spin: 0.05, glassMix: 1, copyRotate: 1.2, folds: 2, delayFrames: 6, delayMix: 0.32 });
-      s.B = loop({ zoom: 0.53, rotate: -0.22, spin: -0.04, glassMix: 1, copyRotate: -1.1, folds: 2, delayFrames: 5, delayMix: 0.24 });
+      s.A = loop({ zoom: 0.74, rotate: 0.28, spin: 0.05, glassMix: 1, copyRotate: 1.2, folds: 2, delayFrames: 6, delayMix: 0.32 });
+      s.B = loop({ zoom: 0.62, rotate: -0.22, spin: -0.04, glassMix: 1, copyRotate: -1.1, folds: 2, delayFrames: 5, delayMix: 0.24 });
       s.insanity = true;
-      s.A.bottomSrc = 2;
+      s.A.bottomSrc = 0;
       s.B.bottomSrc = 2;
-      s.A.top = knobs(0, 1.18, 0.78, 1.26);
-      s.A.bot = knobs(0.04, 1.06, 0.72, 1.2);
+      s.A.top = knobs(0, 1.22, 1.0, 1.14);
+      s.A.bot = knobs(0.04, 1.1, 0.96, 1.1);
+      s.B.top = knobs(0.1, 1.18, 0.98, 1.14);
+      s.B.bot = knobs(0.08, 1.08, 0.94, 1.1);
       s.hueDrift = 0.004;
       s.aberration = 0.002;
       s.chromaSep = 0.04;
@@ -502,8 +517,10 @@ export const PRESETS: Preset[] = [
       s.view = 3;
       s.fps = 24;
       s.persist = 0.12;
-      s.seedAmt = 0.02;
-      s.gamma = 0.98;
+      s.seedAmt = 0.04;
+      s.otherAmt = 0.9;
+      s.gamma = 0.92;
+      s.copyFalloff = 0.97;
       s.noise = 0.005;
       return s;
     },
@@ -552,11 +569,11 @@ export const PRESETS: Preset[] = [
     hint: "Six copies at 60°, half size — a flake from the fold",
     apply: () =>
       foldShow({
-        zoom: 0.33,
+        zoom: 0.4,
         folds: 6,
         copyRotate: Math.PI / 3,
         copyScale: 1,
-        bright: 0.94,
+        bright: 1.02,
         sat: 1.32,
         hue: 0.48,
         hue2: 0.62,
@@ -564,10 +581,10 @@ export const PRESETS: Preset[] = [
         persist: 0.08,
         bloom: 0.12,
         glassMix: 0.44,
-        edge: 0.1,
+        edge: 0.08,
         rotate: 0.02,
-        seedAmt: 0.04,
-        bottomSrc: 1,
+        seedAmt: 0.09,
+        bottomSrc: 0,
       }),
   },
   {
@@ -582,7 +599,7 @@ export const PRESETS: Preset[] = [
         copyScale: 1,
         copyOffX: 0.16,
         copyOffY: 0.06,
-        bright: 0.9,
+        bright: 1.0,
         sat: 1.32,
         hue: -0.06,
         hue2: 0.1,
@@ -592,7 +609,7 @@ export const PRESETS: Preset[] = [
         rotate: 0.04,
         seedAmt: 0.035,
         bloom: 0.06,
-        bottomSrc: 1,
+        bottomSrc: 0,
       }),
   },
   {
@@ -602,15 +619,15 @@ export const PRESETS: Preset[] = [
     apply: () => {
       const s = base();
       s.A = loop({ zoom: 0.48, rotate: 0.08, spin: 0.02, glassMix: 1, copyRotate: Math.PI / 3, folds: 6 });
-      s.A.top = knobs(0.06, 1.08, 0.68, 1.28);
-      s.A.bot = knobs(0.08, 0.98, 0.62, 1.22);
-      s.bloom = 0.06;
+      s.A.top = knobs(0.06, 1.18, 1.0, 1.16);
+      s.A.bot = knobs(0.08, 1.08, 0.96, 1.12);
+      s.bloom = 0.08;
       s.persist = 0.08;
-      s.seedAmt = 0.018;
-      s.gamma = 1.02;
-      s.vignette = 0.16;
-      s.edge = 0.06;
-      s.copyFalloff = 0.8;
+      s.seedAmt = 0.03;
+      s.gamma = 0.94;
+      s.vignette = 0.12;
+      s.edge = 0.08;
+      s.copyFalloff = 0.92;
       s.noise = 0.003;
       return s;
     },
@@ -644,3 +661,15 @@ export const PRESETS: Preset[] = [
     },
   },
 ];
+
+/** Every recipe lands with its nest centred unless it asked for a pan of its own. */
+export const PRESETS: Preset[] = RAW.map((p) => ({
+  ...p,
+  apply: () => {
+    const s = p.apply();
+    for (const L of [s.A, s.B, s.C]) {
+      if (L.panX === 0 && L.panY === 0) centerNest(L);
+    }
+    return s;
+  },
+}));

@@ -128,8 +128,8 @@ export function driveHome(S: DeviceState, home: HomePose, tSec: number, amount: 
   A.spin = clamp(home.spin + c(26.0, 1.4, 0.03), -0.2, 0.2);
   A.copyRotate = home.copyRotate + c(20.0, 1.1, 0.1);
   A.copyScale = clamp(home.copyScale + c(24.0, 2.2, 0.05), 0.4, 1.25);
-  A.panX = clamp(home.panX + c(28.0, 0.7, 0.03), -0.16, 0.16);
-  A.panY = clamp(home.panY + c(32.0, 1.8, 0.03), -0.16, 0.16);
+  A.panX = clamp(home.panX + c(28.0, 0.7, 0.03), -0.5, 0.5);
+  A.panY = clamp(home.panY + c(32.0, 1.8, 0.03), -0.5, 0.5);
   A.glassMix = clamp(home.glassMix + c(21.0, 1.4, 0.06), 0.12, 0.95);
   A.copyOffX = clamp(home.copyOffX + c(25.0, 0.9, 0.03), -0.16, 0.16);
   A.copyOffY = clamp(home.copyOffY + c(29.0, 2.1, 0.03), -0.16, 0.16);

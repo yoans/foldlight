@@ -48,13 +48,15 @@ function applyAperture(ctx: CanvasRenderingContext2D, kind: SeedKind): void {
   const cy = h * 0.5;
   ctx.save();
   ctx.globalCompositeOperation = "destination-in";
-  ctx.filter = `blur(${Math.max(10, w * 0.022)}px)`;
+  // A short feather: enough to kill aliasing, not enough to leave a grey halo
+  // that every generation would copy as an outline.
+  ctx.filter = `blur(${Math.max(3, w * 0.005)}px)`;
   ctx.fillStyle = "#fff";
   ctx.beginPath();
   if (kind === "sun" || kind === "bloom" || kind === "rings" || kind === "burst") {
-    ctx.arc(cx, cy, Math.min(w, h) * 0.4, 0, Math.PI * 2);
+    ctx.arc(cx, cy, Math.min(w, h) * 0.44, 0, Math.PI * 2);
   } else if (kind === "glyphs" || kind === "portrait") {
-    ctx.ellipse(cx, cy, w * 0.36, h * 0.42, 0.08, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy, w * 0.4, h * 0.44, 0.08, 0, Math.PI * 2);
   } else if (kind === "chevrons") {
     const r = Math.min(w, h) * 0.42;
     for (let i = 0; i <= 6; i++) {
@@ -77,7 +79,8 @@ function applyAperture(ctx: CanvasRenderingContext2D, kind: SeedKind): void {
     }
     ctx.closePath();
   } else {
-    ctx.ellipse(cx, cy, w * 0.4, h * 0.4, 0, 0, Math.PI * 2);
+    // Tile seeds are pictures on a monitor: a CRT face with soft corners, not an oval.
+    ctx.roundRect(w * 0.05, h * 0.05, w * 0.9, h * 0.9, w * 0.14);
   }
   ctx.fill();
   ctx.restore();
@@ -251,17 +254,18 @@ function paintSeedBody(ctx: CanvasRenderingContext2D, kind: SeedKind, t: number)
   if (kind === "bloom") {
     ctx.fillStyle = "#08060c";
     ctx.fillRect(0, 0, w, h);
-    const c = w * 0.018;
+    const c = w * 0.024;
     const gold = Math.PI * (3 - Math.sqrt(5));
-    for (let i = 0; i < 420; i++) {
+    for (let i = 0; i < 260; i++) {
       const a = i * gold;
       const r = c * Math.sqrt(i);
       const x = w * 0.5 + Math.cos(a) * r;
       const y = h * 0.5 + Math.sin(a) * r;
-      const rad = 4 + (i % 7);
+      // Fat petals: they must survive being halved a dozen generations deep.
+      const rad = w * 0.011 + (i % 7) * (w * 0.0016);
       ctx.beginPath();
       ctx.arc(x, y, rad, 0, Math.PI * 2);
-      ctx.fillStyle = `hsla(${(i * 4 + 20) % 360}, 78%, ${48 + (i % 20)}%, 0.92)`;
+      ctx.fillStyle = `hsl(${(i * 4 + 20) % 360}, 88%, ${56 + (i % 20)}%)`;
       ctx.fill();
     }
     return;
@@ -291,12 +295,13 @@ function paintSeedBody(ctx: CanvasRenderingContext2D, kind: SeedKind, t: number)
   if (kind === "drift") {
     ctx.fillStyle = "#07060a";
     ctx.fillRect(0, 0, w, h);
-    ctx.lineWidth = Math.max(3, w / 160);
+    ctx.lineWidth = Math.max(5, w / 80);
     ctx.lineCap = "round";
+    ctx.lineJoin = "round";
     for (let i = 0; i < 70; i++) {
       let x = hash(i + 3) * w;
       let y = hash(i + 11) * h;
-      ctx.strokeStyle = `hsla(${(hash(i) * 280 + 10) % 360}, 85%, 58%, 0.88)`;
+      ctx.strokeStyle = `hsl(${(hash(i) * 280 + 10) % 360}, 90%, 64%)`;
       ctx.beginPath();
       ctx.moveTo(x, y);
       for (let k = 0; k < 28; k++) {

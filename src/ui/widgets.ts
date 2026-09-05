@@ -6,6 +6,10 @@ export type KnobOpts = {
   unit?: string;
   bipolar?: boolean;
   format?: (v: number) => string;
+  /** Plain-language tooltip. */
+  help?: string;
+  /** Double-click returns here. Defaults to the starting value. */
+  home?: number;
   onChange: (v: number) => void;
 };
 
@@ -29,6 +33,7 @@ export class Knob {
       <span class="knob-val"></span>
       <span class="knob-lab">${label}</span>
     `;
+    if (opts.help) this.el.title = `${opts.help}\nDrag up or down, scroll, or use the arrow keys. Double-click to reset.`;
     const face = this.el.querySelector(".knob") as HTMLElement;
     face.addEventListener("pointerdown", (e) => {
       this.dragging = true;
@@ -50,7 +55,7 @@ export class Knob {
     };
     face.addEventListener("pointerup", stop);
     face.addEventListener("pointercancel", stop);
-    face.addEventListener("dblclick", () => this.set((this.opts.min + this.opts.max) / 2));
+    face.addEventListener("dblclick", () => this.set(this.opts.home ?? opts.value));
     face.addEventListener("keydown", (e) => {
       const span = this.opts.max - this.opts.min;
       if (e.key === "ArrowUp") this.set(this.value + span * 0.02);
@@ -106,11 +111,12 @@ export function toggle(label: string, on: boolean, onChange: (v: boolean) => voi
   return el;
 }
 
-export function btn(label: string, kind: string, onClick: () => void): HTMLButtonElement {
+export function btn(label: string, kind: string, onClick: () => void, help?: string): HTMLButtonElement {
   const b = document.createElement("button");
   b.type = "button";
   b.className = `act ${kind}`;
   b.textContent = label;
+  if (help) b.title = help;
   b.addEventListener("click", onClick);
   return b;
 }

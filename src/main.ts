@@ -19,7 +19,6 @@ const startFilters = document.querySelector<HTMLElement>("#start-filters")!;
 const playHerd = document.querySelector<HTMLElement>("#play-herd")!;
 const looksEl = document.querySelector<HTMLElement>("#looks")!;
 const listenLed = document.querySelector<HTMLElement>("#listen-led")!;
-const gate = document.querySelector<HTMLElement>("#gate")!;
 const about = document.querySelector<HTMLElement>("#about")!;
 const coach = document.querySelector<HTMLElement>("#coach")!;
 const coachCopy = document.querySelector<HTMLElement>("#coach-copy")!;
@@ -38,8 +37,8 @@ let recording = false;
 let playing = false;
 let rec: DeviceState[] = [];
 let recIndex = 0;
-let currentPreset = "fold-90";
-let currentSession = "kaleid";
+let currentPreset = "king-glass";
+let currentSession = "king-glass";
 let familyFilter: "all" | Family = "all";
 let coachStep = 0;
 let evolveAmt = 0;
@@ -55,11 +54,15 @@ let listenAmt = 0.85;
 let currentLook: string | null = null;
 const ear = new Ear();
 let listenBtn: HTMLButtonElement | null = null;
+let tourBtn: HTMLButtonElement | null = null;
+let tourOn = false;
+let tourAt = 0;
+const TOUR_MS = 20000;
 
 const COACH = [
-  "Each thumbnail is a different universe. Tap one. Then another. There is no bottom.",
-  "Most starts sit still so the nest can finish a thought. Turn Evolve if you want it to wander.",
-  "Trap locks a picture in the loop. Double-tap the screen. Then go as far as it will take you.",
+  "Every thumbnail up top is a picture folded into itself. Tap one, then another.",
+  "Drag the picture to look around. Turn Scale to nest deeper. Double-tap the picture to trap it in the loop.",
+  "Tour walks the whole board for you. Full is fullscreen. Listen makes it move to music.",
 ];
 
 function isPhone(): boolean {
@@ -103,8 +106,9 @@ function addKnob(
   value: number,
   onChange: (v: number) => void,
   format?: (v: number) => string,
+  help?: string,
 ): Knob {
-  const k = new Knob(label, { min, max, value, onChange, format });
+  const k = new Knob(label, { min, max, value, onChange, format, help });
   body.append(k.el);
   return k;
 }
@@ -125,8 +129,8 @@ function loopOptics(title: string, L: LoopState): HTMLElement {
   addKnob(body, "Scale / rod", 0.32, 0.92, L.zoom, (v) => (L.zoom = v));
   addKnob(body, "Tiller", -3.14, 3.14, L.rotate, (v) => (L.rotate = v), (v) => fmt((v * 180) / Math.PI, 0) + "°");
   addKnob(body, "Spin", -1.2, 1.2, L.spin, (v) => (L.spin = v));
-  addKnob(body, "Pan X", -0.25, 0.25, L.panX, (v) => (L.panX = v));
-  addKnob(body, "Pan Y", -0.25, 0.25, L.panY, (v) => (L.panY = v));
+  addKnob(body, "Pan X", -0.5, 0.5, L.panX, (v) => (L.panX = v));
+  addKnob(body, "Pan Y", -0.5, 0.5, L.panY, (v) => (L.panY = v));
   addKnob(body, "Glass", 0, 1, L.glassMix, (v) => (L.glassMix = v));
   addKnob(body, "Copy °", -3.14, 3.14, L.copyRotate, (v) => (L.copyRotate = v), (v) => fmt((v * 180) / Math.PI, 0) + "°");
   addKnob(body, "Copy zm", 0.35, 1.4, L.copyScale, (v) => (L.copyScale = v));
@@ -140,10 +144,15 @@ function loopOptics(title: string, L: LoopState): HTMLElement {
   return rack;
 }
 
-function startSession(id: string): void {
+function startSession(id: string, opts: { fromTour?: boolean } = {}): void {
   const sess = SESSIONS.find((s) => s.id === id) ?? SESSIONS[0];
+  if (!opts.fromTour) setTour(false);
+  tourAt = performance.now();
   currentPreset = sess.preset;
   currentSession = sess.id;
+  const url = new URL(location.href);
+  url.searchParams.set("session", sess.id);
+  history.replaceState(null, "", url);
   seedKind = sess.seed;
   seedLive = false;
   videoEl = null;
@@ -160,10 +169,10 @@ function startSession(id: string): void {
   evolveT0 = 0;
   if (isPhone()) herder.resize(540);
   const moving = evolveAmt >= 0.04;
-  hint.textContent = moving
-    ? `${sess.blurb} Evolve is a slow walk. Drag to pan.`
-    : `${sess.blurb} Sit with it. Turn Evolve if you want it to wander.`;
-  playNudge.textContent = `${sess.name} · ${sess.tag}. ${moving ? "Evolve is a slow walk." : "Evolve is still."}`;
+  hint.textContent = `Drag the picture to look around. Scroll or drag a knob to turn it. Double-tap or press Space to trap.${
+    moving ? " This one drifts on its own; turn Evolve down to hold it." : " Turn Evolve up if you want it to drift."
+  }`;
+  playNudge.textContent = `${sess.name} — ${sess.blurb}`;
   pulseSeed(sess.preset);
   buildDesk();
   buildPlayHerd();
@@ -171,11 +180,28 @@ function startSession(id: string): void {
   buildSessions();
 }
 
+function visibleSessions() {
+  return familyFilter === "all" ? SESSIONS : SESSIONS.filter((s) => s.family === familyFilter);
+}
+
 function surpriseSession(): void {
-  const pool = familyFilter === "all" ? SESSIONS : SESSIONS.filter((s) => s.family === familyFilter);
-  const others = pool.filter((s) => s.id !== currentSession);
+  const others = visibleSessions().filter((s) => s.id !== currentSession);
   const pick = others[Math.floor(Math.random() * others.length)] ?? SESSIONS[0];
   startSession(pick.id);
+}
+
+function stepSession(dir: 1 | -1, fromTour = false): void {
+  const pool = visibleSessions();
+  const i = pool.findIndex((s) => s.id === currentSession);
+  const next = pool[(i + dir + pool.length) % pool.length] ?? pool[0];
+  startSession(next.id, { fromTour });
+}
+
+function setTour(on: boolean): void {
+  tourOn = on;
+  tourAt = performance.now();
+  tourBtn?.classList.toggle("on", on);
+  if (on) hint.textContent = `Tour is on. A new start every ${TOUR_MS / 1000} seconds. Tap any thumbnail or knob to take over.`;
 }
 
 function showCoach(): void {
@@ -222,6 +248,7 @@ function buildSessions(): void {
     const b = document.createElement("button");
     b.type = "button";
     b.className = `start-card${sess.id === currentSession ? " on" : ""}`;
+    b.title = sess.blurb;
     const thumb = document.createElement("canvas");
     thumb.className = "start-thumb";
     thumb.width = 128;
@@ -233,6 +260,7 @@ function buildSessions(): void {
     b.append(thumb, meta);
     b.addEventListener("click", () => startSession(sess.id));
     sessionsEl.append(b);
+    if (sess.id === currentSession) queueMicrotask(() => b.scrollIntoView({ block: "nearest", inline: "nearest" }));
   }
 }
 
@@ -258,27 +286,28 @@ function syncPlayKnobs(): void {
 function buildPlayHerd(): void {
   const A = herder.state.A;
   playHerd.replaceChildren();
+  const deg = (v: number) => fmt((v * 180) / Math.PI, 0) + "°";
   playScale = addKnob(playHerd, "Scale", 0.32, 0.92, home?.zoom ?? A.zoom, (v) => {
     A.zoom = v;
     if (home) home.zoom = v;
-  });
+  }, undefined, "How much smaller each copy is. Lower nests deeper; higher fills the screen.");
   playTiller = addKnob(playHerd, "Tiller", -3.14, 3.14, home?.rotate ?? A.rotate, (v) => {
     A.rotate = v;
     if (home) home.rotate = v;
-  }, (v) => fmt((v * 180) / Math.PI, 0) + "°");
+  }, deg, "Turns the whole picture a little each generation. Small turns make spirals.");
   playCopy = addKnob(playHerd, "Copy °", -6.28, 6.28, home?.copyRotate ?? A.copyRotate, (v) => {
     A.copyRotate = v;
     if (home) home.copyRotate = v;
-  }, (v) => fmt((v * 180) / Math.PI, 0) + "°");
+  }, deg, "The angle between copies. 90° is Peter King’s fold; 120° makes gaskets; 60° makes snowflakes.");
   playFolds = addKnob(playHerd, "Folds", 1, 8, home?.folds ?? A.folds, (v) => {
     const n = Math.round(v);
     A.folds = n;
     if (home) home.folds = n;
-  }, (v) => String(Math.round(v)));
+  }, (v) => String(Math.round(v)), "How many copies sit on the glass at once.");
   playBright = addKnob(playHerd, "Bright", 0, 1.4, A.top.bright, (v) => {
     A.top.bright = v;
     if (home) home.bright = v;
-  });
+  }, undefined, "Camera brightness. The loop lives in a narrow band: too low fades to black, too high floods.");
   playDelay = addKnob(
     playHerd,
     "Delay",
@@ -290,12 +319,27 @@ function buildPlayHerd(): void {
       if (home) home.delayFrames = Math.round(v);
     },
     (v) => (Math.round(v) <= 0 ? "now" : `${Math.round(v)} fr`),
+    "Frames of lag between one generation and the next. Turns motion into trails.",
   );
-  addKnob(playHerd, "Evolve", 0, 1, evolveAmt, (v) => (evolveAmt = v), (v) => (v < 0.04 ? "still" : v >= 0.97 ? "full" : fmt(v)));
+  addKnob(
+    playHerd,
+    "Evolve",
+    0,
+    1,
+    evolveAmt,
+    (v) => (evolveAmt = v),
+    (v) => (v < 0.04 ? "still" : v >= 0.97 ? "full" : fmt(v)),
+    "Lets the knobs drift on their own. Still holds the picture; full wanders.",
+  );
 }
 
 function buildLooks(): void {
   looksEl.replaceChildren();
+  const lab = document.createElement("span");
+  lab.className = "looks-lab";
+  lab.textContent = "Look";
+  lab.title = "Colour grades for the monitors. Tap one mid-session; the nest keeps its shape.";
+  looksEl.append(lab);
   for (const look of LOOKS) {
     const b = document.createElement("button");
     b.type = "button";
@@ -554,9 +598,12 @@ function buildDesk(): void {
 
 function buildTransport(): void {
   transport.replaceChildren();
+  tourBtn = btn("Tour", "play-keep", () => setTour(!tourOn), "Walk the whole board, a new start every 20 seconds.");
   transport.append(
-    btn("Trap / cut", "cut play-keep", () => herder.trap("all")),
-    btn("Inject", "play-keep", () => herder.inject(0.9)),
+    tourBtn,
+    btn("Next", "play-keep", () => stepSession(1), "Jump to the next start. Keyboard: N"),
+    btn("Trap", "cut play-keep", () => herder.trap("all"), "Lock the picture into the loop so it lives without its source. Space or double-tap."),
+    btn("Flash", "play-keep", () => herder.inject(0.9), "Push the seed picture back into the loop for one frame."),
     btn("Trap A", "cut console-only", () => herder.trap("A")),
     btn("Trap B", "cut console-only", () => herder.trap("B")),
     btn("Into fractal", "cut console-only", () => {
@@ -564,10 +611,10 @@ function buildTransport(): void {
       herder.state.B.bottomSrc = 2;
       herder.trap("A");
     }),
-    btn("Clear", "play-keep", () => {
+    btn("Reset", "play-keep", () => {
       herder.clear();
       herder.inject(0.8);
-    }),
+    }, "Black the loop and start this picture over. Keyboard: R"),
     btn("Freeze", "console-only", () => {
       herder.state.frozen = !herder.state.frozen;
     }),
@@ -582,19 +629,20 @@ function buildTransport(): void {
       recording = false;
       recIndex = 0;
     }),
-    btn("Still", "play-keep", () => {
+    btn("Save", "play-keep", () => {
       const a = document.createElement("a");
-      a.download = `herder-${Date.now()}.png`;
+      a.download = `foldlight-${currentSession}-${Date.now()}.png`;
       a.href = canvas.toDataURL("image/png");
       a.click();
-    }),
+    }, "Download this frame as a PNG."),
   );
   listenBtn = btn("Listen", "play-keep", () => {
     void toggleListen();
-  });
+  }, "Use the microphone. Bass pulls Scale in; kicks flash light. Keyboard: L");
   transport.append(listenBtn);
   const song = document.createElement("label");
   song.className = "act file play-keep";
+  song.title = "Play an audio file through the loop. You can also drop one on the picture.";
   song.textContent = "Song";
   const songIn = document.createElement("input");
   songIn.type = "file";
@@ -605,20 +653,20 @@ function buildTransport(): void {
   });
   song.append(songIn);
   transport.append(song);
-  transport.append(btn("Full", "play-keep", goFull));
+  transport.append(btn("Full", "play-keep", goFull, "Fullscreen. Esc to leave."));
 }
 
 buildTransport();
 
 const params = new URLSearchParams(location.search);
 if (params.has("eval")) {
-  gate.classList.add("hidden");
   localStorage.setItem("dlh-coached", "1");
   coach.classList.add("hidden");
   panHint.classList.add("gone");
 }
 
-startSession(params.get("session") ?? "kaleid");
+startSession(params.get("session") ?? "king-glass");
+if (params.has("tour")) setTour(true);
 
 Object.assign(window, {
   __foldlight: {
@@ -643,15 +691,7 @@ Object.assign(window, {
   },
 });
 
-document.querySelector("#enter")?.addEventListener("click", () => {
-  gate.classList.add("hidden");
-  sessionStorage.setItem("dlh-entered", "1");
-  showCoach();
-});
-if (sessionStorage.getItem("dlh-entered")) {
-  gate.classList.add("hidden");
-  showCoach();
-}
+showCoach();
 document.querySelector("#coach-next")?.addEventListener("click", advanceCoach);
 document.querySelector("#coach-skip")?.addEventListener("click", () => {
   coach.classList.add("hidden");
@@ -661,7 +701,6 @@ document.querySelector("#coach-skip")?.addEventListener("click", () => {
 const openAbout = () => about.classList.remove("hidden");
 const closeAbout = () => about.classList.add("hidden");
 document.querySelector("#open-about")?.addEventListener("click", openAbout);
-document.querySelector("#open-about-gate")?.addEventListener("click", openAbout);
 document.querySelector("#close-about")?.addEventListener("click", closeAbout);
 about.addEventListener("click", (e) => {
   if (e.target === about) closeAbout();
@@ -677,6 +716,13 @@ document.querySelector("#mode-console")?.addEventListener("click", () => {
 });
 
 if (isPhone()) herder.resize(540);
+
+// Touching a knob or the picture takes over from the Tour.
+for (const el of [playHerd, canvas, looksEl]) {
+  el.addEventListener("pointerdown", () => {
+    if (tourOn) setTour(false);
+  });
+}
 
 canvas.addEventListener("pointerdown", (e) => {
   canvas.setPointerCapture(e.pointerId);
@@ -716,6 +762,9 @@ window.addEventListener("keydown", (e) => {
     herder.trap("all");
   }
   if (e.key === "l") void toggleListen();
+  if (e.key === "n") stepSession(1);
+  if (e.key === "p") stepSession(-1);
+  if (e.key === "t") setTour(!tourOn);
   if (e.key === "f") herder.state.frozen = !herder.state.frozen;
   if (e.key === "r") {
     herder.clear();
@@ -796,6 +845,7 @@ function loop(now: number): void {
   }
   herder.tick(now);
   syncPlayKnobs();
+  if (tourOn && now - tourAt > TOUR_MS && document.visibilityState === "visible") stepSession(1, true);
   frames++;
   if (now - fpsT > 500) {
     const fps = Math.round((frames * 1000) / (now - fpsT));

@@ -73,7 +73,7 @@ export type DeviceState = {
   copyFalloff: number;
 };
 
-export function knobs(hue = 0, sat = 1.12, bright = 0.88, contrast = 1.24): MonitorKnobs {
+export function knobs(hue = 0, sat = 1.12, bright = 1.0, contrast = 1.14): MonitorKnobs {
   return { hue, sat, bright, contrast };
 }
 
@@ -96,15 +96,51 @@ export function loop(partial: Partial<LoopState> = {}): LoopState {
     flipH: false,
     flipV: false,
     top: knobs(),
-    bot: knobs(0.02, 1.05, 0.82, 1.16),
+    bot: knobs(0.02, 1.05, 0.94, 1.1),
     ...partial,
   };
+}
+
+/**
+ * Pan so the nest's centre of mass sits mid-frame. Every copy is placed at
+ * `pan + offset_i`, so the attractor's centroid is `(pan + mean(offset_i)) / (1 − z̄)`;
+ * `pan = −mean(offset_i)` puts it at zero. Mirrors the placement in FEEDBACK_FRAG.
+ */
+export function centerNest(L: LoopState): LoopState {
+  const folds = Math.max(1, Math.min(8, Math.round(L.folds)));
+  const stepA = Math.abs(L.copyRotate) > 0.001 ? L.copyRotate : (Math.PI * 2) / Math.max(L.folds, 1);
+  const rot = (x: number, y: number, a: number): [number, number] => {
+    const s = Math.sin(a);
+    const c = Math.cos(a);
+    return [c * x - s * y, s * x + c * y];
+  };
+  // A single fold still has the glass monitor beside it.
+  const copies = folds === 1 ? 2 : folds;
+  let sx = 0;
+  let sy = 0;
+  for (let i = 0; i < copies; i++) {
+    const sc = L.zoom * (i === 1 ? L.copyScale : 1);
+    const a = L.rotate + i * stepA;
+    const spread = (1 - sc) * 0.5;
+    const off =
+      folds === 1 && i === 1
+        ? (() => {
+            const r = rot(0, spread, a);
+            return [L.copyOffX + r[0], L.copyOffY + r[1]];
+          })()
+        : rot(L.copyOffX, spread + L.copyOffY, a);
+    sx += off[0];
+    sy += off[1];
+  }
+  L.panX = -sx / copies;
+  L.panY = -sy / copies;
+  return L;
 }
 
 export function defaultState(): DeviceState {
   return {
     A: loop(),
-    B: loop({ rotate: -0.08, copyRotate: -Math.PI / 2, top: knobs(0.04, 1.1, 0.84, 1.26) }),
+    B: loop({ rotate: -0.08, copyRotate: -Math.PI / 2, top: knobs(0.04, 1.1, 0.96, 1.16) }),
     C: loop({ zoom: 0.72, glassMix: 0.35, copyRotate: 0.5, folds: 1 }),
     linkedRods: true,
     insanity: false,
@@ -142,7 +178,7 @@ export function defaultState(): DeviceState {
     period: 1,
     otherAmt: 0.85,
     resolution: 720,
-    copyFalloff: 0.9,
+    copyFalloff: 0.96,
   };
 }
 

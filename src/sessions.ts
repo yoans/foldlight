@@ -27,8 +27,39 @@ export const FAMILIES: { id: "all" | Family; label: string }[] = [
   { id: "iso", label: "Iso" },
 ];
 
-/** Opening board — first-dashboard spectacle restored, then the later nests. */
-export const SESSIONS: Session[] = [
+/**
+ * Board order. The first row is what a visitor sees before scrolling, so it is the
+ * starts that hold a bright, deep nest on their own. Keys 1–9 follow this order.
+ */
+const ORDER = [
+  "king-glass",
+  "spiral",
+  "packed-bloom",
+  "kaleid",
+  "sierpinski",
+  "double-glass",
+  "arc-floor",
+  "iso-stack",
+  "polar-rings",
+  "fair-captive",
+  "cube-city",
+  "insanity",
+  "light-hurt",
+  "arc-nest",
+  "fold-chevrons",
+  "many-nests",
+  "dragon",
+  "four-square",
+  "jellyfish",
+  "gasket",
+  "bloom-hall",
+  "snowflake",
+  "fern",
+  "first-light",
+  "drift-field",
+];
+
+const BOARD: Session[] = [
   {
     id: "kaleid",
     name: "Kaleid",
@@ -284,6 +315,12 @@ export const SESSIONS: Session[] = [
     evolve: 0.22,
   },
 ];
+
+const rank = (id: string) => {
+  const i = ORDER.indexOf(id);
+  return i < 0 ? ORDER.length : i;
+};
+export const SESSIONS: Session[] = [...BOARD].sort((a, b) => rank(a.id) - rank(b.id));
 
 export const B3 = {
   home: "https://buildbeyondbelief.com/",
